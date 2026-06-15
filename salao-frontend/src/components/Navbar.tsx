@@ -5,11 +5,18 @@ export default function Navbar() {
   const location = useLocation();
 
   const links = [
+    { label: 'Agendamentos', path: '/agendamentos' },
     { label: 'Categorias', path: '/categorias' },
     { label: 'Serviços', path: '/servicos' },
     { label: 'Produtos', path: '/produtos' },
     { label: 'Clientes', path: '/clientes' },
     { label: 'Funcionários', path: '/funcionarios' },
+    { label: 'Países', path: '/paises' },
+    { label: 'Estados', path: '/estados' },
+    { label: 'Cidades', path: '/cidades' },
+    { label: 'Formas Pgto', path: '/formas-pagamento' },
+    { label: 'Condições Pgto', path: '/condicoes-pagamento' },
+    { label: 'Parcelas', path: '/parcelas' },
   ];
 
   return (

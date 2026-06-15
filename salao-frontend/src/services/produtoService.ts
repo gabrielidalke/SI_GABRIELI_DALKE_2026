@@ -9,6 +9,8 @@ export interface Produto {
   preco: number;
   quantidade: number;
   ativo: boolean;
+  ncmShId?: number | null;
+  ncmSh?: { id: number; codigo: string; descricao?: string };
 }
 
 export const produtoService = {
