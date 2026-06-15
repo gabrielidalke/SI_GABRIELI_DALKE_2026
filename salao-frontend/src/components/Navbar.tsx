@@ -1,30 +1,70 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const links = [
+    { label: 'Categorias', path: '/categorias' },
+    { label: 'Serviços', path: '/servicos' },
+    { label: 'Produtos', path: '/produtos' },
+    { label: 'Clientes', path: '/clientes' },
+    { label: 'Funcionários', path: '/funcionarios' },
+  ];
 
   return (
     <nav style={{
-      background: '#333',
-      padding: '12px 24px',
+      backgroundColor: '#3D2B1F',
+      padding: '0 32px',
       display: 'flex',
-      gap: 16
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      height: '64px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
     }}>
-        <button onClick={() => navigate('/produtos')} style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>
-  Produtos
-</button>
-      <button onClick={() => navigate('/categorias')} style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>
-        Categorias
-      </button>
-      <button onClick={() => navigate('/servicos')} style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>
-        Serviços
-      </button>
-      <button onClick={() => navigate('/clientes')} style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>
-  Clientes
-</button>
-<button onClick={() => navigate('/funcionarios')} style={{ color: 'white', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>
-  Funcionários
-</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{
+          fontFamily: 'Playfair Display, serif',
+          fontSize: 22,
+          color: '#C97B63',
+          fontStyle: 'italic',
+          letterSpacing: 1
+        }}>
+          ✦ Salão
+        </span>
+        <span style={{
+          fontFamily: 'Playfair Display, serif',
+          fontSize: 22,
+          color: '#FAF7F4',
+          letterSpacing: 1
+        }}>
+          Bella
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        {links.map(link => (
+          <button
+            key={link.path}
+            onClick={() => navigate(link.path)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: location.pathname.startsWith(link.path) ? '#C97B63' : '#F5EDE3',
+              fontSize: 14,
+              fontFamily: 'Lato, sans-serif',
+              fontWeight: location.pathname.startsWith(link.path) ? 700 : 400,
+              padding: '8px 16px',
+              borderBottom: location.pathname.startsWith(link.path) ? '2px solid #C97B63' : '2px solid transparent',
+              transition: 'all 0.2s',
+              letterSpacing: 0.5
+            }}
+          >
+            {link.label}
+          </button>
+        ))}
+      </div>
     </nav>
   );
 }

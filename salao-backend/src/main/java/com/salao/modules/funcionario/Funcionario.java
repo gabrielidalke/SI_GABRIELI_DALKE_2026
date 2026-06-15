@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import com.salao.modules.geo.cidade.Cidade;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -75,6 +76,10 @@ public class Funcionario {
 
     @Column(length = 9)
     private String cep;
+
+    @ManyToOne
+    @JoinColumn(name = "cidade_id")
+    private Cidade cidade;
 
     private BigDecimal salario;
 

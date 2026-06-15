@@ -7,4 +7,5 @@ import java.util.List;
 public interface ProdutoRepository extends JpaRepository<Produto, Long> {
     boolean existsByNomeIgnoreCase(String nome);
     List<Produto> findByAtivoTrue();
+    boolean existsByNcmShId(Long ncmShId);
 }

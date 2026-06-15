@@ -1,6 +1,7 @@
 package com.salao.modules.cliente;
 
-
+import com.salao.modules.geo.cidade.Cidade;
+import com.salao.modules.geo.cidade.CidadeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,7 @@ import java.util.List;
 public class ClienteService {
 
     private final ClienteRepository repository;
+    private final CidadeRepository cidadeRepository;
 
     public List<Cliente> listar() {
         return repository.findAll();
@@ -24,6 +26,12 @@ public class ClienteService {
     public Cliente salvar(ClienteDTO dto) {
         if (dto.cpf() != null && !dto.cpf().isBlank() && repository.existsByCpf(dto.cpf()))
             throw new RuntimeException("CPF já cadastrado");
+
+        Cidade cidade = null;
+        if (dto.cidadeId() != null) {
+            cidade = cidadeRepository.findById(dto.cidadeId()).orElse(null);
+        }
+
         return repository.save(Cliente.builder()
                 .nome(dto.nome())
                 .apelido(dto.apelido())
@@ -40,6 +48,7 @@ public class ClienteService {
                 .sexo(dto.sexo())
                 .estadoCivil(dto.estadoCivil())
                 .observacao(dto.observacao())
+                .cidade(cidade)
                 .build());
     }
 
@@ -61,6 +70,13 @@ public class ClienteService {
         c.setEstadoCivil(dto.estadoCivil());
         c.setObservacao(dto.observacao());
         c.setAtivo(dto.ativo());
+
+        if (dto.cidadeId() != null) {
+            cidadeRepository.findById(dto.cidadeId()).ifPresent(c::setCidade);
+        } else {
+            c.setCidade(null);
+        }
+
         return repository.save(c);
     }
 

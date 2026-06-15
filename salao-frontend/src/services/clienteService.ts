@@ -20,6 +20,12 @@ export interface Cliente {
   estadoCivil?: string;
   observacao?: string;
   ativo: boolean;
+  cidadeId?: number;
+  cidade?: {
+    id: number;
+    nome: string;
+    estado: { id: number; nome: string; uf: string };
+  };
 }
 
 export const clienteService = {

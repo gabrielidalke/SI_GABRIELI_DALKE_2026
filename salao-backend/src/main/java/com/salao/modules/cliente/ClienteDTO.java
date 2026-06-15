@@ -1,6 +1,5 @@
 package com.salao.modules.cliente;
 
-
 import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDate;
 
@@ -21,5 +20,6 @@ public record ClienteDTO(
         String sexo,
         String estadoCivil,
         String observacao,
-        Boolean ativo
+        Boolean ativo,
+        Long cidadeId
 ) {}

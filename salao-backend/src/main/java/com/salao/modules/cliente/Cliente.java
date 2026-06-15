@@ -1,6 +1,7 @@
 package com.salao.modules.cliente;
 
 
+import com.salao.modules.geo.cidade.Cidade;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -28,6 +29,10 @@ public class Cliente {
     @Column(nullable = false, length = 50)
     @NotBlank
     private String nome;
+
+    @ManyToOne
+    @JoinColumn(name = "cidade_id")
+    private Cidade cidade;
 
     @Column(length = 60)
     private String apelido;

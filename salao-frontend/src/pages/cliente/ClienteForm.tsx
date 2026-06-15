@@ -2,112 +2,206 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Cliente } from '../../services/clienteService';
 import { clienteService } from '../../services/clienteService';
+import type { Estado } from '../../services/estadoService';
+import { estadoService } from '../../services/estadoService';
+import type { Cidade } from '../../services/cidadeService';
+import { cidadeService } from '../../services/cidadeService';
+
+const inputStyle = {
+  width: '100%',
+  padding: '10px 14px',
+  border: '1px solid #E8D5C8',
+  borderRadius: 8,
+  fontFamily: 'Lato, sans-serif',
+  fontSize: 14,
+  color: '#3D2B1F',
+  backgroundColor: 'white',
+  outline: 'none',
+};
+
+const labelStyle = {
+  display: 'block',
+  fontSize: 12,
+  fontWeight: 700,
+  color: '#8B6F61',
+  marginBottom: 6,
+  letterSpacing: 1,
+  textTransform: 'uppercase' as const,
+};
+
+const selectStyle = { ...inputStyle, cursor: 'pointer' };
+
+const sectionTitle = {
+  fontFamily: 'Playfair Display, serif',
+  fontSize: 16,
+  color: '#C97B63',
+  marginBottom: 16,
+  marginTop: 8,
+};
 
 export default function ClienteForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [form, setForm] = useState<Cliente>({
-    nome: '', ativo: true
-  });
+  const [form, setForm] = useState<Cliente & { estadoId?: number }>({ nome: '', ativo: true });
+  const [estados, setEstados] = useState<Estado[]>([]);
+  const [cidades, setCidades] = useState<Cidade[]>([]);
 
   useEffect(() => {
-    if (id) clienteService.buscar(Number(id)).then(res => setForm(res.data));
+    estadoService.listar().then(res => setEstados(res.data));
+    if (id) clienteService.buscar(Number(id)).then(res => {
+      const c = res.data as any;
+      setForm({ ...c, estadoId: c.cidade?.estado?.id });
+      if (c.cidade?.estado?.id) {
+        cidadeService.listarPorEstado(c.cidade.estado.id).then(r => setCidades(r.data));
+      }
+    });
   }, [id]);
 
-  const salvar = async () => {
+  const onEstadoChange = (estadoId: number) => {
+    setForm({ ...form, estadoId, cidade: undefined } as any);
+    if (estadoId) cidadeService.listarPorEstado(estadoId).then(res => setCidades(res.data));
+    else setCidades([]);
+  };
+
+ const salvar = async () => {
+    const payload = {
+      ...form,
+      cidadeId: form.cidadeId || null,
+    };
     if (id) {
-      await clienteService.atualizar(Number(id), form);
+      await clienteService.atualizar(Number(id), payload as any);
     } else {
-      await clienteService.salvar(form);
+      await clienteService.salvar(payload as any);
     }
     navigate('/clientes');
   };
-
   return (
-    <div style={{ padding: 24 }}>
-      <h2>{id ? 'Editar' : 'Novo'} Cliente</h2>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div>
-          <label>Nome*: </label>
-          <input style={{ width: '100%' }} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
-        </div>
-        <div>
-          <label>Apelido: </label>
-          <input style={{ width: '100%' }} value={form.apelido || ''} onChange={e => setForm({ ...form, apelido: e.target.value })} />
-        </div>
-        <div>
-          <label>CPF: </label>
-          <input style={{ width: '100%' }} value={form.cpf || ''} onChange={e => setForm({ ...form, cpf: e.target.value })} />
-        </div>
-        <div>
-          <label>RG: </label>
-          <input style={{ width: '100%' }} value={form.rg || ''} onChange={e => setForm({ ...form, rg: e.target.value })} />
-        </div>
-        <div>
-          <label>Telefone: </label>
-          <input style={{ width: '100%' }} value={form.telefone || ''} onChange={e => setForm({ ...form, telefone: e.target.value })} />
-        </div>
-        <div>
-          <label>Email: </label>
-          <input style={{ width: '100%' }} value={form.email || ''} onChange={e => setForm({ ...form, email: e.target.value })} />
-        </div>
-        <div>
-          <label>Data Nascimento: </label>
-          <input type="date" style={{ width: '100%' }} value={form.dataNascimento || ''} onChange={e => setForm({ ...form, dataNascimento: e.target.value })} />
-        </div>
-        <div>
-          <label>Sexo: </label>
-          <select style={{ width: '100%' }} value={form.sexo || ''} onChange={e => setForm({ ...form, sexo: e.target.value })}>
-            <option value="">Selecione</option>
-            <option value="M">Masculino</option>
-            <option value="F">Feminino</option>
-          </select>
-        </div>
-        <div>
-          <label>Estado Civil: </label>
-          <select style={{ width: '100%' }} value={form.estadoCivil || ''} onChange={e => setForm({ ...form, estadoCivil: e.target.value })}>
-            <option value="">Selecione</option>
-            <option value="Solteiro(a)">Solteiro(a)</option>
-            <option value="Casado(a)">Casado(a)</option>
-            <option value="Divorciado(a)">Divorciado(a)</option>
-            <option value="Viúvo(a)">Viúvo(a)</option>
-          </select>
-        </div>
-        <div>
-          <label>CEP: </label>
-          <input style={{ width: '100%' }} value={form.cep || ''} onChange={e => setForm({ ...form, cep: e.target.value })} />
-        </div>
-        <div>
-          <label>Endereço: </label>
-          <input style={{ width: '100%' }} value={form.endereco || ''} onChange={e => setForm({ ...form, endereco: e.target.value })} />
-        </div>
-        <div>
-          <label>Número: </label>
-          <input style={{ width: '100%' }} value={form.numero || ''} onChange={e => setForm({ ...form, numero: e.target.value })} />
-        </div>
-        <div>
-          <label>Bairro: </label>
-          <input style={{ width: '100%' }} value={form.bairro || ''} onChange={e => setForm({ ...form, bairro: e.target.value })} />
-        </div>
-        <div>
-          <label>Complemento: </label>
-          <input style={{ width: '100%' }} value={form.complemento || ''} onChange={e => setForm({ ...form, complemento: e.target.value })} />
-        </div>
-        <div style={{ gridColumn: 'span 2' }}>
-          <label>Observação: </label>
-          <textarea style={{ width: '100%' }} value={form.observacao || ''} onChange={e => setForm({ ...form, observacao: e.target.value })} />
-        </div>
-        <div>
-          <label>Ativo: </label>
-          <input type="checkbox" checked={form.ativo} onChange={e => setForm({ ...form, ativo: e.target.checked })} />
-        </div>
+    <div style={{ padding: '32px 40px', maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 28, color: '#3D2B1F' }}>
+          {id ? 'EDITAR' : 'NOVO'} CLIENTE
+        </h2>
+        <p style={{ color: '#8B6F61', fontSize: 14, marginTop: 4 }}>
+          {id ? 'ATUALIZE OS DADOS DO CLIENTE' : 'PREENCHA OS DADOS DO NOVO CLIENTE'}
+        </p>
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <button onClick={salvar}>Salvar</button>
-        {' '}
-        <button onClick={() => navigate('/clientes')}>Voltar</button>
+      <div style={{ backgroundColor: 'white', borderRadius: 12, border: '1px solid #E8D5C8', padding: 32, boxShadow: '0 2px 12px rgba(201,123,99,0.08)' }}>
+
+        {/* ENDEREÇO */}
+        <p style={sectionTitle}>ENDEREÇO</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+          <div>
+            <label style={labelStyle}>CEP</label>
+            <input style={inputStyle} placeholder="00000-000" value={form.cep || ''} onChange={e => setForm({ ...form, cep: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>NÚMERO</label>
+            <input style={inputStyle} placeholder="Nº" value={form.numero || ''} onChange={e => setForm({ ...form, numero: e.target.value })} />
+          </div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <label style={labelStyle}>ENDEREÇO</label>
+            <input style={inputStyle} placeholder="Rua, Avenida..." value={form.endereco || ''} onChange={e => setForm({ ...form, endereco: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>BAIRRO</label>
+            <input style={inputStyle} placeholder="Bairro" value={form.bairro || ''} onChange={e => setForm({ ...form, bairro: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>COMPLEMENTO</label>
+            <input style={inputStyle} placeholder="Apto, Bloco..." value={form.complemento || ''} onChange={e => setForm({ ...form, complemento: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>ESTADO</label>
+            <select style={selectStyle} value={(form as any).estadoId || ''} onChange={e => onEstadoChange(Number(e.target.value))}>
+              <option value="">SELECIONE O ESTADO</option>
+              {estados.map(e => <option key={e.id} value={e.id}>{e.nome} ({e.uf})</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>CIDADE</label>
+            <select style={selectStyle} value={(form as any).cidadeId || ''} onChange={e => setForm({ ...form, cidadeId: Number(e.target.value) } as any)} disabled={cidades.length === 0}>
+              <option value="">SELECIONE A CIDADE</option>
+              {cidades.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* CONTATO */}
+        <p style={sectionTitle}>CONTATO</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+          <div>
+            <label style={labelStyle}>TELEFONE *</label>
+            <input style={inputStyle} placeholder="(00) 00000-0000" value={form.telefone || ''} onChange={e => setForm({ ...form, telefone: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>EMAIL</label>
+            <input style={inputStyle} placeholder="email@exemplo.com" value={form.email || ''} onChange={e => setForm({ ...form, email: e.target.value })} />
+          </div>
+        </div>
+
+        {/* DADOS PESSOAIS */}
+        <p style={sectionTitle}>DADOS PESSOAIS</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+          <div style={{ gridColumn: 'span 2' }}>
+            <label style={labelStyle}>NOME *</label>
+            <input style={inputStyle} placeholder="Nome completo" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>APELIDO</label>
+            <input style={inputStyle} placeholder="Apelido" value={form.apelido || ''} onChange={e => setForm({ ...form, apelido: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>CPF</label>
+            <input style={inputStyle} placeholder="000.000.000-00" value={form.cpf || ''} onChange={e => setForm({ ...form, cpf: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>RG</label>
+            <input style={inputStyle} placeholder="RG" value={form.rg || ''} onChange={e => setForm({ ...form, rg: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>DATA DE NASCIMENTO</label>
+            <input type="date" style={inputStyle} value={form.dataNascimento || ''} onChange={e => setForm({ ...form, dataNascimento: e.target.value })} />
+          </div>
+          <div>
+            <label style={labelStyle}>SEXO</label>
+            <select style={selectStyle} value={form.sexo || ''} onChange={e => setForm({ ...form, sexo: e.target.value })}>
+              <option value="">SELECIONE</option>
+              <option value="M">MASCULINO</option>
+              <option value="F">FEMININO</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>ESTADO CIVIL</label>
+            <select style={selectStyle} value={form.estadoCivil || ''} onChange={e => setForm({ ...form, estadoCivil: e.target.value })}>
+              <option value="">SELECIONE</option>
+              <option value="Solteiro(a)">SOLTEIRO(A)</option>
+              <option value="Casado(a)">CASADO(A)</option>
+              <option value="Divorciado(a)">DIVORCIADO(A)</option>
+              <option value="Viúvo(a)">VIÚVO(A)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* OBSERVAÇÕES */}
+        <p style={sectionTitle}>OBSERVAÇÕES</p>
+        <div style={{ marginBottom: 24 }}>
+          <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} placeholder="Observações sobre o cliente..." value={form.observacao || ''} onChange={e => setForm({ ...form, observacao: e.target.value })} />
+        </div>
+
+        <div style={{ marginBottom: 28, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input type="checkbox" id="ativo" checked={form.ativo} onChange={e => setForm({ ...form, ativo: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#C97B63', cursor: 'pointer' }} />
+          <label htmlFor="ativo" style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}>ATIVO</label>
+        </div>
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button onClick={salvar} style={{ backgroundColor: '#C97B63', color: 'white', border: 'none', borderRadius: 8, padding: '10px 32px', cursor: 'pointer', fontFamily: 'Lato, sans-serif', fontSize: 14, fontWeight: 700 }}>
+            SALVAR
+          </button>
+          <button onClick={() => navigate('/clientes')} style={{ backgroundColor: 'transparent', color: '#8B6F61', border: '1px solid #E8D5C8', borderRadius: 8, padding: '10px 32px', cursor: 'pointer', fontFamily: 'Lato, sans-serif', fontSize: 14, fontWeight: 600 }}>
+            VOLTAR
+          </button>
+        </div>
       </div>
     </div>
   );

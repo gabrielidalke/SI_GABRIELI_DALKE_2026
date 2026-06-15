@@ -1,6 +1,5 @@
 package com.salao.modules.produto;
 
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,23 +15,23 @@ public class ProdutoController {
     private final ProdutoService service;
 
     @GetMapping
-    public List<Produto> listar() {
+    public List<ProdutoResponseDTO> listar() {
         return service.listar();
     }
 
     @GetMapping("/{id}")
-    public Produto buscar(@PathVariable Long id) {
+    public ProdutoResponseDTO buscar(@PathVariable Long id) {
         return service.buscarPorId(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Produto criar(@RequestBody @Valid ProdutoDTO dto) {
+    public ProdutoResponseDTO criar(@RequestBody @Valid ProdutoDTO dto) {
         return service.salvar(dto);
     }
 
     @PutMapping("/{id}")
-    public Produto atualizar(@PathVariable Long id, @RequestBody @Valid ProdutoDTO dto) {
+    public ProdutoResponseDTO atualizar(@PathVariable Long id, @RequestBody @Valid ProdutoDTO dto) {
         return service.atualizar(id, dto);
     }
 

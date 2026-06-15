@@ -6,6 +6,7 @@ import java.util.List;
 
 public interface ClienteRepository extends JpaRepository<Cliente, Long> {
     boolean existsByCpf(String cpf);
+    boolean existsByCidadeId(Long cidadeId);
     List<Cliente> findByAtivoTrue();
     List<Cliente> findByNomeContainingIgnoreCase(String nome);
 }

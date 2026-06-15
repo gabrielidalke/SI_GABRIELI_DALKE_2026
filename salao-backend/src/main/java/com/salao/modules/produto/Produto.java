@@ -1,6 +1,7 @@
 package com.salao.modules.produto;
 
 
+import com.salao.modules.ncmsh.NcmSh;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -50,4 +51,8 @@ public class Produto {
     @UpdateTimestamp
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
+
+    @ManyToOne
+    @JoinColumn(name = "ncm_sh_id")
+    private NcmSh ncmSh;
 }
