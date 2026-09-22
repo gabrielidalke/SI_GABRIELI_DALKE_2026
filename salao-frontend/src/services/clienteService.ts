@@ -4,8 +4,10 @@ const API = 'http://localhost:8080/api';
 
 export interface Cliente {
   id?: number;
+  tipo?: string;
   nome: string;
   apelido?: string;
+  contato?: string;
   email?: string;
   telefone?: string;
   endereco?: string;
@@ -18,9 +20,11 @@ export interface Cliente {
   dataNascimento?: string;
   sexo?: string;
   estadoCivil?: string;
+  nacionalidade?: string;
   observacao?: string;
   ativo: boolean;
   cidadeId?: number;
+  condicaoPagamentoId?: number;
   cidade?: {
     id: number;
     nome: string;

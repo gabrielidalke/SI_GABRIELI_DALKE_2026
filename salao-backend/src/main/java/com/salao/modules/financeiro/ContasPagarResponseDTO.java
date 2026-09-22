@@ -17,14 +17,14 @@ public record ContasPagarResponseDTO(
         ParcelaInfo parcela
 ) {
     public record FornecedorInfo(Long id, String fornecedor) {}
-    public record ParcelaInfo(Long id, Integer numeroDias) {}
+    public record ParcelaInfo(Long id, Integer diasVencimento) {}
 
     public static ContasPagarResponseDTO from(ContasPagar c) {
         FornecedorInfo fornecedor = c.getFornecedor() != null
                 ? new FornecedorInfo(c.getFornecedor().getId(), c.getFornecedor().getFornecedor())
                 : null;
         ParcelaInfo parcela = c.getParcela() != null
-                ? new ParcelaInfo(c.getParcela().getId(), c.getParcela().getNumeroDias())
+                ? new ParcelaInfo(c.getParcela().getId(), c.getParcela().getDiasVencimento())
                 : null;
         return new ContasPagarResponseDTO(
                 c.getId(), c.getDescricao(), c.getValor(),

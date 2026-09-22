@@ -8,4 +8,7 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long> {
     boolean existsByNomeIgnoreCase(String nome);
     List<Produto> findByAtivoTrue();
     boolean existsByNcmShId(Long ncmShId);
+    boolean existsByMarcaId(Long marcaId);
+    boolean existsByUnidadeMedidaId(Long unidadeMedidaId);
+    boolean existsByCategoriaId(Long categoriaId);
 }

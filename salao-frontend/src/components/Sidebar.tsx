@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Calendar, Users, UserCheck, Scissors, Package, Tag, Truck,
+  Calendar, Users, UserCheck, Scissors, Package, Tag, Truck, Ruler,
   CreditCard, MapPin, ChevronDown, ChevronUp,
   ArrowDownCircle, ArrowUpCircle, FileText,
 } from 'lucide-react';
 
-const financeiroRotas = ['/formas-pagamento', '/condicoes-pagamento', '/parcelas', '/contas-pagar', '/contas-receber'];
+const financeiroRotas = ['/formas-pagamento', '/condicoes-pagamento', '/contas-pagar', '/contas-receber'];
 const localizacaoRotas = ['/paises', '/estados', '/cidades'];
 const fiscalRotas = ['/compras', '/notas-fiscais-entrada', '/vendas', '/notas-fiscais-saida', '/notas-fiscais-servico', '/ncm-sh'];
 
@@ -31,9 +31,11 @@ export default function Sidebar() {
     { label: 'Clientes',     path: '/clientes',     icon: <Users size={16} /> },
     { label: 'Funcionários', path: '/funcionarios', icon: <UserCheck size={16} /> },
     { label: 'Serviços',     path: '/servicos',     icon: <Scissors size={16} /> },
-    { label: 'Produtos',     path: '/produtos',     icon: <Package size={16} /> },
-    { label: 'Categorias',   path: '/categorias',   icon: <Tag size={16} /> },
-    { label: 'Fornecedores', path: '/fornecedores', icon: <Truck size={16} /> },
+    { label: 'Produtos',          path: '/produtos',         icon: <Package size={16} /> },
+    { label: 'Categorias',        path: '/categorias',       icon: <Tag size={16} /> },
+    { label: 'Marcas',            path: '/marcas',           icon: <Tag size={16} /> },
+    { label: 'Unidades de Medida', path: '/unidades-medida', icon: <Ruler size={16} /> },
+    { label: 'Fornecedores',      path: '/fornecedores',     icon: <Truck size={16} /> },
   ];
 
   return (
@@ -90,11 +92,10 @@ export default function Sidebar() {
         {financeiroAberto && (
           <div>
             {[
-              { label: 'Formas de Pgto',    path: '/formas-pagamento',   icon: undefined as JSX.Element | undefined },
-              { label: 'Condições de Pgto', path: '/condicoes-pagamento', icon: undefined as JSX.Element | undefined },
-              { label: 'Parcelas',          path: '/parcelas',            icon: undefined as JSX.Element | undefined },
-              { label: 'Contas a Pagar',    path: '/contas-pagar',        icon: <ArrowDownCircle size={13} /> as JSX.Element | undefined },
-              { label: 'Contas a Receber',  path: '/contas-receber',      icon: <ArrowUpCircle size={13} />  as JSX.Element | undefined },
+              { label: 'Formas de Pgto',    path: '/formas-pagamento',    icon: null },
+              { label: 'Condições de Pgto', path: '/condicoes-pagamento', icon: null },
+              { label: 'Contas a Pagar',    path: '/contas-pagar',        icon: <ArrowDownCircle size={13} /> },
+              { label: 'Contas a Receber',  path: '/contas-receber',      icon: <ArrowUpCircle size={13} /> },
             ].map(item => (
               <button
                 key={item.path}

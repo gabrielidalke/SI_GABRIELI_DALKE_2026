@@ -1,6 +1,7 @@
 package com.salao.modules.fornecedor;
 
 import com.salao.modules.geo.cidade.Cidade;
+import com.salao.modules.pagamento.CondicaoPagamento;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -55,4 +56,8 @@ public class Fornecedor {
     @ManyToOne
     @JoinColumn(name = "cidade_id")
     private Cidade cidade;
+
+    @ManyToOne
+    @JoinColumn(name = "condicao_pagamento_id")
+    private CondicaoPagamento condicaoPagamento;
 }

@@ -2,6 +2,7 @@ package com.salao.modules.cliente;
 
 import com.salao.modules.geo.cidade.Cidade;
 import com.salao.modules.geo.cidade.CidadeRepository;
+import com.salao.util.CpfCnpjValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,8 +25,12 @@ public class ClienteService {
     }
 
     public Cliente salvar(ClienteDTO dto) {
-        if (dto.cpf() != null && !dto.cpf().isBlank() && repository.existsByCpf(dto.cpf()))
-            throw new RuntimeException("CPF já cadastrado");
+        if (dto.cpf() != null && !dto.cpf().isBlank()) {
+            if (!CpfCnpjValidator.validarCPF(dto.cpf()))
+                throw new RuntimeException("CPF inválido.");
+            if (repository.existsByCpf(dto.cpf()))
+                throw new RuntimeException("CPF já cadastrado");
+        }
 
         Cidade cidade = null;
         if (dto.cidadeId() != null) {
@@ -54,6 +59,10 @@ public class ClienteService {
 
     public Cliente atualizar(Long id, ClienteDTO dto) {
         Cliente c = buscarPorId(id);
+
+        if (dto.cpf() != null && !dto.cpf().isBlank() && !CpfCnpjValidator.validarCPF(dto.cpf()))
+            throw new RuntimeException("CPF inválido.");
+
         c.setNome(dto.nome());
         c.setApelido(dto.apelido());
         c.setEmail(dto.email());

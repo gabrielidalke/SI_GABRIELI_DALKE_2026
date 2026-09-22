@@ -4,14 +4,16 @@ const API = 'http://localhost:8080/api';
 
 export interface Parcela {
   id: number;
-  numeroDias: number;
+  diasVencimento: number;
+  percentual: number;
   formaPagamento: { id: number; formaPagamento: string };
   condicaoPagamento: { id: number; condicao: string };
   ativo: boolean;
 }
 
 export interface ParcelaRequest {
-  numeroDias: number;
+  diasVencimento: number;
+  percentual: number;
   formaPagamentoId: number;
   condicaoPagamentoId: number;
   ativo: boolean;

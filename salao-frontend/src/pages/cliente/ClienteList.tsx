@@ -43,7 +43,7 @@ export default function ClienteList() {
                 <td style={td}>{c.cpf || '—'}</td>
                 <td style={td}><span style={badge(c.ativo)}>{c.ativo ? 'Ativo' : 'Inativo'}</span></td>
                 <td style={td}>
-                  <button style={btnEdit} onClick={() => navigate(`/clientes/${c.id}`)}>Editar</button>
+                  <button style={btnEdit} onClick={() => navigate(`/clientes/editar/${c.id}`)}>Editar</button>
                   <button style={btnDelete} onClick={() => deletar(c.id!)}>Excluir</button>
                 </td>
               </tr>

@@ -19,8 +19,11 @@ public class Parcela {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "numero_dias", nullable = false)
-    private Integer numeroDias;
+    @Column(name = "numero_parcela")
+    private Integer numeroParcela;
+
+    @Column(name = "dias_vencimento", nullable = false)
+    private Integer diasVencimento;
 
     @Builder.Default
     private Boolean ativo = true;

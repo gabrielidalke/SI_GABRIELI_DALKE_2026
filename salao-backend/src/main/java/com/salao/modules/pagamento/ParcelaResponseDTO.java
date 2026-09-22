@@ -4,7 +4,8 @@ import java.time.LocalDateTime;
 
 public record ParcelaResponseDTO(
         Long id,
-        Integer numeroDias,
+        Integer numeroParcela,
+        Integer diasVencimento,
         Boolean ativo,
         LocalDateTime criadoEm,
         FormaPagamentoInfo formaPagamento,
@@ -20,6 +21,6 @@ public record ParcelaResponseDTO(
         CondicaoPagamentoInfo cp = p.getCondicaoPagamento() != null
                 ? new CondicaoPagamentoInfo(p.getCondicaoPagamento().getId(), p.getCondicaoPagamento().getCondicao())
                 : null;
-        return new ParcelaResponseDTO(p.getId(), p.getNumeroDias(), p.getAtivo(), p.getCriadoEm(), fp, cp);
+        return new ParcelaResponseDTO(p.getId(), p.getNumeroParcela(), p.getDiasVencimento(), p.getAtivo(), p.getCriadoEm(), fp, cp);
     }
 }

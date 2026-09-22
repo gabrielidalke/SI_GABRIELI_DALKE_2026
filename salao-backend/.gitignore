@@ -33,3 +33,9 @@ build/
 .vscode/
 
 application.properties
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# backup zip local
+salao-backend-src.zip

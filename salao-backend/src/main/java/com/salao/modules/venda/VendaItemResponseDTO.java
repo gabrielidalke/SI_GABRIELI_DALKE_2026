@@ -9,11 +9,11 @@ public record VendaItemResponseDTO(
         BigDecimal subtotal,
         ProdutoInfo produto
 ) {
-    public record ProdutoInfo(Long id, String nome, BigDecimal preco) {}
+    public record ProdutoInfo(Long id, String nome, BigDecimal precoVenda) {}
 
     public static VendaItemResponseDTO from(VendaItem item) {
         ProdutoInfo produto = item.getProduto() != null
-                ? new ProdutoInfo(item.getProduto().getId(), item.getProduto().getNome(), item.getProduto().getPreco())
+                ? new ProdutoInfo(item.getProduto().getId(), item.getProduto().getNome(), item.getProduto().getPrecoVenda())
                 : null;
         return new VendaItemResponseDTO(
                 item.getId(), item.getQuantidade(), item.getPrecoUnitario(), item.getSubtotal(), produto

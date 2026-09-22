@@ -1,6 +1,7 @@
 package com.salao.modules.funcionario;
 
 
+import com.salao.util.CpfCnpjValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,8 +24,12 @@ public class FuncionarioService {
     }
 
     public Funcionario salvar(FuncionarioDTO dto) {
-        if (dto.cpf() != null && !dto.cpf().isBlank() && repository.existsByCpf(dto.cpf()))
-            throw new RuntimeException("CPF já cadastrado");
+        if (dto.cpf() != null && !dto.cpf().isBlank()) {
+            if (!CpfCnpjValidator.validarCPF(dto.cpf()))
+                throw new RuntimeException("CPF inválido.");
+            if (repository.existsByCpf(dto.cpf()))
+                throw new RuntimeException("CPF já cadastrado");
+        }
         return repository.save(Funcionario.builder()
                 .nome(dto.nome())
                 .apelido(dto.apelido())
@@ -48,6 +53,10 @@ public class FuncionarioService {
 
     public Funcionario atualizar(Long id, FuncionarioDTO dto) {
         Funcionario f = buscarPorId(id);
+
+        if (dto.cpf() != null && !dto.cpf().isBlank() && !CpfCnpjValidator.validarCPF(dto.cpf()))
+            throw new RuntimeException("CPF inválido.");
+
         f.setNome(dto.nome());
         f.setApelido(dto.apelido());
         f.setEmail(dto.email());

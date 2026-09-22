@@ -3,36 +3,25 @@ import type { CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Funcionario } from '../../services/funcionarioService';
 import { funcionarioService } from '../../services/funcionarioService';
-import type { Estado } from '../../services/estadoService';
-import { estadoService } from '../../services/estadoService';
-import type { Cidade } from '../../services/cidadeService';
-import { cidadeService } from '../../services/cidadeService';
 import { inputStyle, labelStyle, card, btnPrimary, btnCancel, pageTitle, pageSubtitle, sectionTitle } from '../../styles/theme';
+import CidadeAutocomplete from '../../components/CidadeAutocomplete';
 
-const sel = { ...inputStyle, cursor: 'pointer' };
+const sel: CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 24 };
 
 export default function FuncionarioForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [form, setForm] = useState<Funcionario & { estadoId?: number; cidadeId?: number }>({ nome: '', email: '', telefone: '', dataAdmissao: '', ativo: true });
-  const [estados, setEstados] = useState<Estado[]>([]);
-  const [cidades, setCidades] = useState<Cidade[]>([]);
+  const [form, setForm] = useState<Funcionario & { cidadeId?: number }>({
+    nome: '', email: '', telefone: '', dataAdmissao: '', ativo: true,
+  });
 
   useEffect(() => {
-    estadoService.listar().then(r => setEstados(r.data));
     if (id) funcionarioService.buscar(Number(id)).then(r => {
       const f = r.data as any;
-      setForm({ ...f, estadoId: f.cidade?.estado?.id, cidadeId: f.cidade?.id });
-      if (f.cidade?.estado?.id) cidadeService.listarPorEstado(f.cidade.estado.id).then(x => setCidades(x.data));
+      setForm({ ...f, cidadeId: f.cidade?.id });
     });
   }, [id]);
-
-  const onEstado = (estadoId: number) => {
-    setForm(p => ({ ...p, estadoId, cidadeId: undefined }));
-    if (estadoId) cidadeService.listarPorEstado(estadoId).then(r => setCidades(r.data));
-    else setCidades([]);
-  };
 
   const salvar = async () => {
     if (id) await funcionarioService.atualizar(Number(id), form as any);
@@ -70,19 +59,12 @@ export default function FuncionarioForm() {
             <label style={labelStyle}>Complemento</label>
             <input style={inputStyle} placeholder="Apto, Bloco..." value={form.complemento || ''} onChange={e => setForm({ ...form, complemento: e.target.value })} />
           </div>
-          <div style={{ gridColumn: 'span 6' }}>
-            <label style={labelStyle}>Estado</label>
-            <select style={sel} value={form.estadoId || ''} onChange={e => onEstado(Number(e.target.value))}>
-              <option value="">Selecione o estado</option>
-              {estados.map(e => <option key={e.id} value={e.id}>{e.nome} ({e.uf})</option>)}
-            </select>
-          </div>
-          <div style={{ gridColumn: 'span 6' }}>
+          <div style={{ gridColumn: 'span 12' }}>
             <label style={labelStyle}>Cidade</label>
-            <select style={sel} value={form.cidadeId || ''} onChange={e => setForm({ ...form, cidadeId: Number(e.target.value) })} disabled={cidades.length === 0}>
-              <option value="">Selecione a cidade</option>
-              {cidades.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-            </select>
+            <CidadeAutocomplete
+              value={form.cidadeId ?? null}
+              onChange={cidadeId => setForm({ ...form, cidadeId: cidadeId ?? undefined })}
+            />
           </div>
         </div>
 

@@ -1,0 +1,125 @@
+================================================================================
+MAPA RAPIDO - ONDE ENCONTRAR CADA COISA NO CODIGO (salao-backend)
+================================================================================
+
+REGRA GERAL
+--------------------------------------------------------------------------------
+Tudo fica em: src/main/java/com/salao/modules/<modulo>/
+
+- Campos da tabela .......................... <Entidade>.java
+- Validacao de formato de entrada ............ <Entidade>RequestDTO.java (ou <Entidade>DTO.java)
+- Regra de negocio (quase sempre a resposta) . <Entidade>Service.java
+- Rota HTTP .................................. <Entidade>Controller.java
+
+
+VALIDACAO DE CPF/CNPJ
+--------------------------------------------------------------------------------
+Algoritmo:  util/CpfCnpjValidator.java
+Uso:        modules/cliente/ClienteService.java
+            modules/funcionario/FuncionarioService.java
+            modules/fornecedor/FornecedorService.java (metodo validarCpfCnpj)
+
+
+DUPLICIDADE DE CADASTRO (nome/codigo ja existe)
+--------------------------------------------------------------------------------
+Onde olhar: inicio do metodo salvar()/criar() de cada *Service.java,
+            sempre um "if (repository.existsBy...)"
+Exemplos:   PaisService, EstadoService, ProdutoService, ServicoService,
+            CategoriaService, FormaPagamentoService, CondicaoPagamentoService
+
+
+MAQUINA DE ESTADOS DO AGENDAMENTO
+--------------------------------------------------------------------------------
+Arquivo:    modules/agendamento/AgendamentoService.java
+Metodos:    confirmar(), concluir(), cancelar(), deletar()
+Estados:    AGENDADO -> CONFIRMADO -> CONCLUIDO
+            AGENDADO ou CONFIRMADO -> CANCELADO
+
+
+MAQUINA DE ESTADOS DE COMPRA/VENDA
+--------------------------------------------------------------------------------
+Arquivos:   modules/compra/CompraService.java
+            modules/venda/VendaService.java
+Metodos:    validar(), cancelar(), gerarNfe()
+Estados:    RASCUNHO -> VALIDADA -> NFE_GERADA
+            RASCUNHO ou VALIDADA -> CANCELADA
+
+
+CALCULO AUTOMATICO DE VALOR TOTAL
+--------------------------------------------------------------------------------
+Agendamento: AgendamentoService.criar() -> soma o preco de cada servico
+Compra/Venda: CompraService/VendaService
+            subtotal = quantidade x precoUnitario (por item)
+            valorTotal = soma de todos os subtotais
+            (sempre recalculado no backend, nunca confia no valor do frontend)
+
+
+GERACAO DE NOTA FISCAL
+--------------------------------------------------------------------------------
+Entrada:    CompraService.gerarNfe() -> modules/fiscal/entrada/NotaFiscalEntradaService.java
+Saida:      VendaService.gerarNfe() -> modules/fiscal/saida/NotaFiscalSaidaService.java
+Servico:    modules/fiscal/servico/NotaFiscalServicoService.java (gerarParaAgendamento)
+            -> unico com endpoint proprio: POST /api/notas-fiscais-servico/gerar/{agendamentoId}
+Numeracao:  "NFE-"/"NFS-"/"NFSE-" + id formatado com 6 digitos, gerado apos o primeiro save()
+
+
+BLOQUEIO DE EXCLUSAO POR VINCULO
+--------------------------------------------------------------------------------
+Onde olhar: dentro do metodo deletar() de cada Service, checando
+            existsBy...Id antes de repository.deleteById(...)
+Exemplos:   PaisService (estados), EstadoService (cidades), CidadeService (clientes),
+            MarcaService / UnidadeMedidaService / NcmShService / CategoriaService (produtos),
+            FornecedorService (contas a pagar), FormaPagamentoService (parcelas)
+Contas a Pagar/Receber: so exclui se situacao == "CANCELADA"
+Agendamento: so exclui se status == "CANCELADO"
+
+
+RELACIONAMENTO N:N
+--------------------------------------------------------------------------------
+Arquivo:    modules/agendamento/Agendamento.java
+            (@ManyToMany + @JoinTable agendamento_servicos)
+
+
+RELACIONAMENTO 1:1
+--------------------------------------------------------------------------------
+Arquivos:   modules/fiscal/entrada/NotaFiscalEntrada.java   (1:1 com Compra)
+            modules/fiscal/saida/NotaFiscalSaida.java       (1:1 com Venda)
+            modules/fiscal/servico/NotaFiscalServico.java   (1:1 com Agendamento)
+
+
+TRATAMENTO GLOBAL DE ERRO (HTTP 400 padronizado)
+--------------------------------------------------------------------------------
+Arquivo:    config/GlobalExceptionHandler.java
+O que faz:  captura qualquer RuntimeException lancada por qualquer regra de
+            negocio e devolve HTTP 400 com {"mensagem": "..."}
+
+
+CORS
+--------------------------------------------------------------------------------
+Arquivo:    config/CorsConfig.java (libera http://localhost:5173)
+
+
+VALIDACOES DE FORMATO DE CAMPO (obrigatorio, tamanho maximo)
+--------------------------------------------------------------------------------
+Onde olhar: anotacoes dentro dos *RequestDTO.java / *DTO.java de cada modulo
+            (@NotBlank, @NotNull, @Size, @Positive, @NotEmpty)
+Tabela completa de tamanho de campo por entidade: RELATORIO_TECNICO_ACADEMICO.md (secao 2)
+
+
+SEQUENCIA SUGERIDA PARA DEMONSTRAR AO VIVO
+--------------------------------------------------------------------------------
+1. Cadastrar Cliente com CPF invalido -> mostra erro 400 "CPF invalido."
+2. Cadastrar Agendamento com 2 servicos -> mostra valorTotal calculado sozinho
+3. Confirmar -> Concluir o agendamento -> mostra a maquina de estados
+4. Gerar NFS-e para esse agendamento -> mostra numeracao automatica e bloqueio
+   de gerar duas vezes
+5. Cadastrar Compra com itens -> Validar -> Gerar NF-e -> mesmo padrao para entrada
+
+
+LIMITACOES CONHECIDAS (bom saber responder se perguntarem)
+--------------------------------------------------------------------------------
+- Estoque de produto nao e debitado/creditado automaticamente por Compra/Venda
+- Validar Compra/Venda nao gera Contas a Pagar/Receber automaticamente
+- Flyway esta desabilitado (spring.flyway.enabled=false); algumas migrations
+  estao desatualizadas em relacao as entidades atuais (ex: coluna "juro")
+================================================================================

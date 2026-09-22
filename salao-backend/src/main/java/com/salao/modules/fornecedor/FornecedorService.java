@@ -2,6 +2,9 @@ package com.salao.modules.fornecedor;
 
 import com.salao.modules.financeiro.ContasPagarRepository;
 import com.salao.modules.geo.cidade.CidadeRepository;
+import com.salao.modules.pagamento.CondicaoPagamento;
+import com.salao.modules.pagamento.CondicaoPagamentoRepository;
+import com.salao.util.CpfCnpjValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +17,7 @@ public class FornecedorService {
     private final FornecedorRepository repository;
     private final ContasPagarRepository contasPagarRepository;
     private final CidadeRepository cidadeRepository;
+    private final CondicaoPagamentoRepository condicaoPagamentoRepository;
 
     public List<FornecedorResponseDTO> listar() {
         return repository.findAll().stream().map(FornecedorResponseDTO::from).toList();
@@ -24,10 +28,13 @@ public class FornecedorService {
     }
 
     public FornecedorResponseDTO criar(FornecedorRequestDTO dto) {
+        validarCpfCnpj(dto.cpfCnpj());
+
         var cidade = dto.cidadeId() != null
                 ? cidadeRepository.findById(dto.cidadeId())
                         .orElseThrow(() -> new RuntimeException("Cidade não encontrada"))
                 : null;
+        var condicaoPagamento = resolveCondicaoPagamento(dto.condicaoPagamentoId());
 
         var fornecedor = Fornecedor.builder()
                 .fornecedor(dto.fornecedor())
@@ -39,12 +46,15 @@ public class FornecedorService {
                 .inscricaoEstadual(dto.inscricaoEstadual())
                 .ativo(dto.ativo() != null ? dto.ativo() : true)
                 .cidade(cidade)
+                .condicaoPagamento(condicaoPagamento)
                 .build();
 
         return FornecedorResponseDTO.from(repository.save(fornecedor));
     }
 
     public FornecedorResponseDTO atualizar(Long id, FornecedorRequestDTO dto) {
+        validarCpfCnpj(dto.cpfCnpj());
+
         var fornecedor = buscarEntidade(id);
         var cidade = dto.cidadeId() != null
                 ? cidadeRepository.findById(dto.cidadeId())
@@ -60,6 +70,7 @@ public class FornecedorService {
         fornecedor.setInscricaoEstadual(dto.inscricaoEstadual());
         if (dto.ativo() != null) fornecedor.setAtivo(dto.ativo());
         fornecedor.setCidade(cidade);
+        fornecedor.setCondicaoPagamento(resolveCondicaoPagamento(dto.condicaoPagamentoId()));
 
         return FornecedorResponseDTO.from(repository.save(fornecedor));
     }
@@ -70,6 +81,24 @@ public class FornecedorService {
             throw new RuntimeException("Fornecedor possui contas a pagar vinculadas e não pode ser excluído");
         }
         repository.deleteById(id);
+    }
+
+    private void validarCpfCnpj(String cpfCnpj) {
+        if (cpfCnpj == null || cpfCnpj.isBlank()) return;
+        String digitos = cpfCnpj.replaceAll("\\D", "");
+        if (digitos.length() == 11) {
+            if (!CpfCnpjValidator.validarCPF(cpfCnpj))
+                throw new RuntimeException("CPF inválido.");
+        } else {
+            if (!CpfCnpjValidator.validarCNPJ(cpfCnpj))
+                throw new RuntimeException("CNPJ inválido.");
+        }
+    }
+
+    private CondicaoPagamento resolveCondicaoPagamento(Long id) {
+        if (id == null) return null;
+        return condicaoPagamentoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Condição de pagamento não encontrada"));
     }
 
     private Fornecedor buscarEntidade(Long id) {

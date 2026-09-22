@@ -1,6 +1,7 @@
 package com.salao.modules.cliente;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import java.time.LocalDate;
 
 public record ClienteDTO(
@@ -13,6 +14,8 @@ public record ClienteDTO(
         String numero,
         String complemento,
         String bairro,
+        @NotBlank(message = "CEP é obrigatório")
+        @Pattern(regexp = "\\d{5}-?\\d{3}", message = "CEP inválido")
         String cep,
         String cpf,
         String rg,

@@ -7,6 +7,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "condicoes_pagamento")
@@ -28,6 +30,10 @@ public class CondicaoPagamento {
     private BigDecimal multa = BigDecimal.ZERO;
 
     @Builder.Default
+    @Column(name = "juro", precision = 5, scale = 2)
+    private BigDecimal juro = BigDecimal.ZERO;
+
+    @Builder.Default
     @Column(precision = 5, scale = 2)
     private BigDecimal desconto = BigDecimal.ZERO;
 
@@ -41,4 +47,8 @@ public class CondicaoPagamento {
     @UpdateTimestamp
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "condicaoPagamento", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Parcela> parcelas = new ArrayList<>();
 }

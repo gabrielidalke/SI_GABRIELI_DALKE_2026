@@ -1,5 +1,6 @@
 package com.salao.modules.categoria;
 
+import com.salao.modules.produto.ProdutoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +11,7 @@ import java.util.List;
 public class CategoriaService {
 
     private final CategoriaRepository repository;
+    private final ProdutoRepository produtoRepository;
 
     public List<Categoria> listar() {
         return repository.findAll();
@@ -34,6 +36,9 @@ public class CategoriaService {
     }
 
     public void deletar(Long id) {
+        buscarPorId(id);
+        if (produtoRepository.existsByCategoriaId(id))
+            throw new RuntimeException("Não é possível excluir: existem produtos vinculados a esta categoria");
         repository.deleteById(id);
     }
 }

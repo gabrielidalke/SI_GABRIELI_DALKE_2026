@@ -17,14 +17,14 @@ public record ContasReceberResponseDTO(
         ParcelaInfo parcela
 ) {
     public record ClienteInfo(Long id, String nome) {}
-    public record ParcelaInfo(Long id, Integer numeroDias) {}
+    public record ParcelaInfo(Long id, Integer diasVencimento) {}
 
     public static ContasReceberResponseDTO from(ContasReceber c) {
         ClienteInfo cliente = c.getCliente() != null
                 ? new ClienteInfo(c.getCliente().getId(), c.getCliente().getNome())
                 : null;
         ParcelaInfo parcela = c.getParcela() != null
-                ? new ParcelaInfo(c.getParcela().getId(), c.getParcela().getNumeroDias())
+                ? new ParcelaInfo(c.getParcela().getId(), c.getParcela().getDiasVencimento())
                 : null;
         return new ContasReceberResponseDTO(
                 c.getId(), c.getDescricao(), c.getValor(),

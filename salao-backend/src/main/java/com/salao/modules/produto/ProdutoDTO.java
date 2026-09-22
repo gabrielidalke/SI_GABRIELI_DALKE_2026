@@ -9,8 +9,13 @@ public record ProdutoDTO(
         Long id,
         @NotBlank String nome,
         String descricao,
-        @NotNull @Positive BigDecimal preco,
+        @NotNull @Positive BigDecimal precoVenda,
         Integer quantidade,
         Boolean ativo,
-        Long ncmShId
+        Long ncmShId,
+        Long marcaId,
+        Long unidadeMedidaId,
+        Long categoriaId,
+        BigDecimal precoCusto,
+        BigDecimal desconto
 ) {}

@@ -1,35 +1,33 @@
 import { useEffect, useState } from 'react';
-import { condicaoPagamentoService, type CondicaoPagamento, type CondicaoPagamentoRequest } from '../services/condicaoPagamentoService';
-import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnDelete, badge, btnNew, pageTitle, pageSubtitle, erroBanner } from '../styles/theme';
-
-const EMPTY: CondicaoPagamentoRequest = { condicao: '', multa: undefined, desconto: undefined, ativo: true };
+import { useNavigate } from 'react-router-dom';
+import { condicaoPagamentoService, type CondicaoPagamento } from '../services/condicaoPagamentoService';
+import { parcelaService, type Parcela } from '../services/parcelaService';
+import { th, td, card, btnNew, btnEdit, btnDelete, pageTitle, pageSubtitle } from '../styles/theme';
 
 export default function CondicoesPagamento() {
   const [lista, setLista] = useState<CondicaoPagamento[]>([]);
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState<CondicaoPagamentoRequest & { id?: number }>(EMPTY);
-  const [erro, setErro] = useState('');
+  const [parcelasMap, setParcelasMap] = useState<Map<number, number>>(new Map());
+  const navigate = useNavigate();
 
   useEffect(() => { carregar(); }, []);
 
   const carregar = async () => {
-    try { const r = await condicaoPagamentoService.listar(); setLista(r.data); }
-    catch (e) { console.error('Erro ao carregar condições de pagamento:', e); }
-  };
-
-  const abrirNovo = () => { setForm(EMPTY); setErro(''); setModal(true); };
-  const abrirEditar = (item: CondicaoPagamento) => {
-    setForm({ id: item.id, condicao: item.condicao, multa: item.multa, desconto: item.desconto, ativo: item.ativo });
-    setErro(''); setModal(true);
-  };
-
-  const salvar = async () => {
-    if (!form.condicao.trim()) { setErro('Condição é obrigatória.'); return; }
     try {
-      const dto: CondicaoPagamentoRequest = { condicao: form.condicao, multa: form.multa, desconto: form.desconto, ativo: form.ativo };
-      form.id ? await condicaoPagamentoService.atualizar(form.id, dto) : await condicaoPagamentoService.criar(dto);
-      setModal(false); carregar();
-    } catch (e: any) { setErro(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.'); }
+      const [condRes, parcelasRes] = await Promise.all([
+        condicaoPagamentoService.listar(),
+        parcelaService.listar(),
+      ]);
+      setLista(condRes.data);
+
+      const mapa = new Map<number, number>();
+      (parcelasRes.data as Parcela[]).forEach(p => {
+        const cid = p.condicaoPagamento?.id;
+        if (cid) mapa.set(cid, (mapa.get(cid) ?? 0) + 1);
+      });
+      setParcelasMap(mapa);
+    } catch (e) {
+      console.error('Erro ao carregar condições de pagamento:', e);
+    }
   };
 
   const deletar = async (id: number) => {
@@ -45,14 +43,16 @@ export default function CondicoesPagamento() {
           <h2 style={pageTitle}>Condições de Pagamento</h2>
           <p style={pageSubtitle}>Gerencie as condições de pagamento</p>
         </div>
-        <button onClick={abrirNovo} style={btnNew}>+ Nova Condição</button>
+        <button onClick={() => navigate('/condicoes-pagamento/nova')} style={btnNew}>+ Nova Condição</button>
       </div>
 
       <div style={card}>
         <table className="salon-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#FDF0E8' }}>
-              {['ID', 'Condição', 'Multa (%)', 'Desconto (%)', 'Status', 'Ações'].map(h => <th key={h} style={th}>{h}</th>)}
+              {['ID', 'Condição', 'Multa (%)', 'Juros (%)', 'Desconto (%)', 'Nº Parcelas', 'Ações'].map(h => (
+                <th key={h} style={th}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -61,51 +61,27 @@ export default function CondicoesPagamento() {
                 <td style={{ ...td, color: '#8B6E63' }}>{item.id}</td>
                 <td style={{ ...td, fontWeight: 500 }}>{item.condicao}</td>
                 <td style={td}>{item.multa != null ? `${item.multa}%` : '—'}</td>
+                <td style={td}>{item.juro != null ? `${item.juro}%` : '—'}</td>
                 <td style={td}>{item.desconto != null ? `${item.desconto}%` : '—'}</td>
-                <td style={td}><span style={badge(item.ativo)}>{item.ativo ? 'Ativo' : 'Inativo'}</span></td>
+                <td style={{ ...td, textAlign: 'center' }}>
+                  <span style={{ display: 'inline-block', backgroundColor: '#FDF0E8', color: '#8B6E63', padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                    {parcelasMap.get(item.id) ?? 0}
+                  </span>
+                </td>
                 <td style={td}>
-                  <button style={btnEdit} onClick={() => abrirEditar(item)}>Editar</button>
+                  <button style={btnEdit} onClick={() => navigate(`/condicoes-pagamento/editar/${item.id}`)}>Editar</button>
                   <button style={btnDelete} onClick={() => deletar(item.id)}>Excluir</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {lista.length === 0 && <div style={{ padding: 48, textAlign: 'center', color: '#8B6E63' }}><p style={{ fontFamily: 'Playfair Display, serif', fontSize: 18 }}>Nenhuma condição cadastrada</p></div>}
-      </div>
-
-      {modal && (
-        <div style={modalOverlay}>
-          <div style={modalBox}>
-            <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: 22, color: '#3D2B1F', marginBottom: 24, marginTop: 0 }}>{form.id ? 'Editar Condição de Pagamento' : 'Nova Condição de Pagamento'}</h3>
-            {erro && <p style={erroBanner}>{erro}</p>}
-            <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
-              <div>
-                <label style={labelStyle}>Condição de Pagamento *</label>
-                <input style={inputStyle} placeholder="Ex: À Vista, 30/60/90 dias..." value={form.condicao} onChange={e => setForm({ ...form, condicao: e.target.value })} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <label style={labelStyle}>Multa (%)</label>
-                  <input type="number" min={0} max={100} step={0.01} style={inputStyle} placeholder="Ex: 2.00" value={form.multa ?? ''} onChange={e => setForm({ ...form, multa: e.target.value === '' ? undefined : Number(e.target.value) })} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Desconto (%)</label>
-                  <input type="number" min={0} max={100} step={0.01} style={inputStyle} placeholder="Ex: 5.00" value={form.desconto ?? ''} onChange={e => setForm({ ...form, desconto: e.target.value === '' ? undefined : Number(e.target.value) })} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input type="checkbox" id="ativo-cond" checked={form.ativo} onChange={e => setForm({ ...form, ativo: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#C97B6B', cursor: 'pointer' }} />
-                <label htmlFor="ativo-cond" style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}>Ativo</label>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={salvar} style={btnPrimary}>Salvar</button>
-              <button onClick={() => setModal(false)} style={btnCancel}>Cancelar</button>
-            </div>
+        {lista.length === 0 && (
+          <div style={{ padding: 48, textAlign: 'center', color: '#8B6E63' }}>
+            <p style={{ fontFamily: 'Playfair Display, serif', fontSize: 18 }}>Nenhuma condição cadastrada</p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

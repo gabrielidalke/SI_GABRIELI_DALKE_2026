@@ -1,0 +1,53 @@
+================================================================================
+ARQUITETURA E STACK TECNOLOGICA - SISTEMA SALAO
+================================================================================
+
+ARQUITETURA
+--------------------------------------------------------------------------------
+Package by Feature (organizacao por modulo de dominio) - nao e o classico
+"package by layer" (onde teria uma pasta controllers/, uma services/, uma
+repositories/ para o projeto inteiro). Aqui cada pasta em modules/ representa
+uma funcionalidade de negocio completa, e dentro dela ficam todas as camadas
+daquele recurso:
+
+com.salao.modules.<entidade>/
+  <Entidade>.java              -> camada de dominio/persistencia (@Entity)
+  <Entidade>Controller.java    -> camada de apresentacao/API (@RestController)
+  <Entidade>Service.java       -> camada de negocio (@Service)
+  <Entidade>Repository.java    -> camada de acesso a dados (Spring Data JPA)
+  <Entidade>RequestDTO.java    -> objeto de entrada
+  <Entidade>ResponseDTO.java   -> objeto de saida
+
+Ou seja: arquitetura em camadas (Controller -> Service -> Repository -> Banco),
+so que replicada por modulo de dominio em vez de agrupada globalmente.
+E um MONOLITO MODULAR. Modulos que dependem de outros (ex: Compra depende de
+Fornecedor e Produto) fazem isso por injecao de dependencia normal do Spring
+(@RequiredArgsConstructor do Lombok), sem camada de "core"/"shared" - o
+compartilhamento acontece direto entre modulos.
+
+Fora dos modulos, so duas pastas transversais:
+  com.salao.config -> configuracao global (CORS, tratamento de erro)
+  com.salao.util   -> utilitario sem estado (validador de CPF/CNPJ)
+
+
+STACK - BACKEND (salao-backend)
+--------------------------------------------------------------------------------
+- Java 17
+- Spring Boot 4.0.5 (spring-boot-starter-data-jpa, -validation, -webmvc)
+- Hibernate/JPA como ORM
+- PostgreSQL (driver org.postgresql)
+- Flyway (presente no pom.xml, mas DESABILITADO - spring.flyway.enabled=false;
+  schema mantido manualmente)
+- Lombok (@Data, @Builder, etc. - reduz boilerplate de getters/setters/construtores)
+- Maven (build, via mvnw)
+
+
+STACK - FRONTEND (salao-frontend)
+--------------------------------------------------------------------------------
+- React 19 + TypeScript
+- Vite (build/dev server)
+- React Router DOM (rotas)
+- Tailwind CSS (varios componentes tambem usam "style" inline)
+- Axios (cliente HTTP)
+- lucide-react (icones)
+================================================================================

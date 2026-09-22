@@ -5,12 +5,21 @@ const API = 'http://localhost:8080/api';
 export interface Produto {
   id?: number;
   nome: string;
-  descricao: string;
-  preco: number;
+  descricao?: string;
+  preco?: number;
+  precoVenda?: number;
   quantidade: number;
   ativo: boolean;
   ncmShId?: number | null;
   ncmSh?: { id: number; codigo: string; descricao?: string };
+  marcaId?: number | null;
+  marca?: { id: number; marca: string };
+  unidadeMedidaId?: number | null;
+  unidadeMedida?: { id: number; unidadeMedida: string; sigla: string };
+  categoriaId?: number | null;
+  categoria?: { id: number; nome: string };
+  precoCusto?: number;
+  desconto?: number;
 }
 
 export const produtoService = {

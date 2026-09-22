@@ -5,16 +5,27 @@ const API = 'http://localhost:8080/api';
 export interface CondicaoPagamento {
   id: number;
   condicao: string;
+  juro?: number;
   multa?: number;
   desconto?: number;
   ativo: boolean;
 }
 
+export interface ParcelaEmCondicao {
+  id?: number;
+  numeroParcela: number;
+  diasVencimento: number;
+  percentual: number;
+  formaPagamentoId: number;
+}
+
 export interface CondicaoPagamentoRequest {
   condicao: string;
+  juro?: number;
   multa?: number;
   desconto?: number;
   ativo: boolean;
+  parcelas?: ParcelaEmCondicao[];
 }
 
 export const condicaoPagamentoService = {

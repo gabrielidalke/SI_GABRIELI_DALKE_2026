@@ -23,7 +23,8 @@ public class ParcelaService {
 
     public ParcelaResponseDTO criar(ParcelaRequestDTO dto) {
         var parcela = Parcela.builder()
-                .numeroDias(dto.numeroDias())
+                .numeroParcela(dto.numeroParcela())
+                .diasVencimento(dto.diasVencimento())
                 .ativo(dto.ativo() != null ? dto.ativo() : true)
                 .formaPagamento(resolveFormaPagamento(dto.formaPagamentoId()))
                 .condicaoPagamento(resolveCondicaoPagamento(dto.condicaoPagamentoId()))
@@ -33,7 +34,8 @@ public class ParcelaService {
 
     public ParcelaResponseDTO atualizar(Long id, ParcelaRequestDTO dto) {
         var parcela = buscarEntidade(id);
-        parcela.setNumeroDias(dto.numeroDias());
+        parcela.setNumeroParcela(dto.numeroParcela());
+        parcela.setDiasVencimento(dto.diasVencimento());
         if (dto.ativo() != null) parcela.setAtivo(dto.ativo());
         parcela.setFormaPagamento(resolveFormaPagamento(dto.formaPagamentoId()));
         parcela.setCondicaoPagamento(resolveCondicaoPagamento(dto.condicaoPagamentoId()));
