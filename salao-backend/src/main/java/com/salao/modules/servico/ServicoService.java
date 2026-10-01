@@ -34,6 +34,8 @@ public class ServicoService {
 
     public Servico atualizar(Long id, ServicoDTO dto) {
         Servico s = buscarPorId(id);
+        if (!s.getNome().equalsIgnoreCase(dto.nome()) && repository.existsByNomeIgnoreCase(dto.nome()))
+            throw new RuntimeException("Serviço já cadastrado");
         s.setNome(dto.nome());
         s.setDescricao(dto.descricao());
         s.setDuracaoMin(dto.duracaoMin());

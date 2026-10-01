@@ -4,7 +4,7 @@ import { formaPagamentoService, type FormaPagamento } from '../services/formaPag
 import { condicaoPagamentoService, type CondicaoPagamento } from '../services/condicaoPagamentoService';
 import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnDelete, badge, btnNew, pageTitle, pageSubtitle, erroBanner } from '../styles/theme';
 
-const EMPTY: ParcelaRequest = { numeroDias: 0, formaPagamentoId: 0, condicaoPagamentoId: 0, ativo: true };
+const EMPTY: ParcelaRequest = { diasVencimento: 0, percentual: 0, formaPagamentoId: 0, condicaoPagamentoId: 0, ativo: true };
 
 export default function Parcelas() {
   const [lista, setLista] = useState<Parcela[]>([]);
@@ -31,16 +31,16 @@ export default function Parcelas() {
   const abrirNovo = () => { carregarOpcoes(); setForm(EMPTY); setErro(''); setModal(true); };
   const abrirEditar = (item: Parcela) => {
     carregarOpcoes();
-    setForm({ id: item.id, numeroDias: item.numeroDias, formaPagamentoId: item.formaPagamento.id, condicaoPagamentoId: item.condicaoPagamento.id, ativo: item.ativo });
+    setForm({ id: item.id, diasVencimento: item.diasVencimento, percentual: item.percentual, formaPagamentoId: item.formaPagamento.id, condicaoPagamentoId: item.condicaoPagamento.id, ativo: item.ativo });
     setErro(''); setModal(true);
   };
 
   const salvar = async () => {
-    if (!form.numeroDias || form.numeroDias < 0) { setErro('Número de dias é obrigatório.'); return; }
+    if (!form.diasVencimento || form.diasVencimento < 0) { setErro('Número de dias é obrigatório.'); return; }
     if (!form.formaPagamentoId) { setErro('Selecione a forma de pagamento.'); return; }
     if (!form.condicaoPagamentoId) { setErro('Selecione a condição de pagamento.'); return; }
     try {
-      const dto: ParcelaRequest = { numeroDias: form.numeroDias, formaPagamentoId: form.formaPagamentoId, condicaoPagamentoId: form.condicaoPagamentoId, ativo: form.ativo };
+      const dto: ParcelaRequest = { diasVencimento: form.diasVencimento, percentual: form.percentual, formaPagamentoId: form.formaPagamentoId, condicaoPagamentoId: form.condicaoPagamentoId, ativo: form.ativo };
       form.id ? await parcelaService.atualizar(form.id, dto) : await parcelaService.criar(dto);
       setModal(false); carregar();
     } catch (e: any) { setErro(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.'); }
@@ -73,7 +73,7 @@ export default function Parcelas() {
             {lista.map(item => (
               <tr key={item.id} style={{ borderTop: '1px solid #F0E6DC' }}>
                 <td style={{ ...td, color: '#8B6E63' }}>{item.id}</td>
-                <td style={{ ...td, fontWeight: 500 }}>{item.numeroDias}</td>
+                <td style={{ ...td, fontWeight: 500 }}>{item.diasVencimento}</td>
                 <td style={td}>{item.formaPagamento?.formaPagamento ?? '—'}</td>
                 <td style={td}>{item.condicaoPagamento?.condicao ?? '—'}</td>
                 <td style={td}><span style={badge(item.ativo)}>{item.ativo ? 'Ativo' : 'Inativo'}</span></td>
@@ -96,7 +96,11 @@ export default function Parcelas() {
             <div style={{ display: 'grid', gap: 16, marginBottom: 24 }}>
               <div>
                 <label style={labelStyle}>Número de Dias *</label>
-                <input type="number" min={0} style={inputStyle} placeholder="Ex: 30" value={form.numeroDias || ''} onChange={e => setForm({ ...form, numeroDias: Number(e.target.value) })} />
+                <input type="number" min={0} style={inputStyle} placeholder="Ex: 30" value={form.diasVencimento || ''} onChange={e => setForm({ ...form, diasVencimento: Number(e.target.value) })} />
+              </div>
+              <div>
+                <label style={labelStyle}>Percentual (%)</label>
+                <input type="number" min={0} max={100} step={0.01} style={inputStyle} placeholder="Ex: 50" value={form.percentual || ''} onChange={e => setForm({ ...form, percentual: Number(e.target.value) })} />
               </div>
               <div>
                 <label style={labelStyle}>Forma de Pagamento *</label>

@@ -26,6 +26,7 @@ public class CondicaoPagamentoService {
     public CondicaoPagamentoResponseDTO criar(CondicaoPagamentoRequestDTO dto) {
         if (repository.existsByCondicao(dto.condicao()))
             throw new RuntimeException("Condição de pagamento já cadastrada");
+        validarSomaPercentuais(dto.parcelas());
         var cp = CondicaoPagamento.builder()
                 .condicao(dto.condicao())
                 .multa(dto.multa() != null ? dto.multa() : BigDecimal.ZERO)
@@ -39,6 +40,7 @@ public class CondicaoPagamentoService {
 
     @Transactional
     public CondicaoPagamentoResponseDTO atualizar(Long id, CondicaoPagamentoRequestDTO dto) {
+        validarSomaPercentuais(dto.parcelas());
         var cp = buscarEntidade(id);
         cp.setCondicao(dto.condicao());
         if (dto.multa() != null) cp.setMulta(dto.multa());
@@ -61,6 +63,7 @@ public class CondicaoPagamentoService {
             var parcela = Parcela.builder()
                     .numeroParcela(p.numeroParcela())
                     .diasVencimento(p.diasVencimento())
+                    .percentual(p.percentual() != null ? p.percentual() : BigDecimal.ZERO)
                     .ativo(p.ativo() != null ? p.ativo() : true)
                     .formaPagamento(resolveFormaPagamento(p.formaPagamentoId()))
                     .condicaoPagamento(cp)
@@ -73,6 +76,16 @@ public class CondicaoPagamentoService {
         if (id == null) return null;
         return formaPagamentoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Forma de pagamento não encontrada"));
+    }
+
+    private void validarSomaPercentuais(List<ParcelaRequestDTO> parcelas) {
+        if (parcelas == null || parcelas.isEmpty())
+            throw new RuntimeException("Adicione pelo menos uma parcela.");
+        BigDecimal soma = parcelas.stream()
+                .map(p -> p.percentual() != null ? p.percentual() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (soma.compareTo(BigDecimal.valueOf(100)) != 0)
+            throw new RuntimeException("A soma dos percentuais das parcelas deve ser exatamente 100% (atual: " + soma + "%).");
     }
 
     private CondicaoPagamento buscarEntidade(Long id) {

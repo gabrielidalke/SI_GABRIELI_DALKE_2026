@@ -42,11 +42,13 @@ public class AgendamentoService {
     }
 
     public AgendamentoResponseDTO criar(AgendamentoRequestDTO dto) {
+        if (dto.dataHora().isBefore(LocalDateTime.now()))
+            throw new RuntimeException("Data/hora do agendamento não pode ser no passado.");
         var cliente = clienteRepository.findById(dto.clienteId())
                 .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
         var funcionario = funcionarioRepository.findById(dto.funcionarioId())
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
-        List<Servico> servicos = servicoRepository.findAllById(dto.servicoIds());
+        List<Servico> servicos = buscarServicos(dto.servicoIds());
         BigDecimal total = servicos.stream().map(Servico::getPreco).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         var agendamento = Agendamento.builder()
@@ -71,7 +73,7 @@ public class AgendamentoService {
                 .orElseThrow(() -> new RuntimeException("Cliente não encontrado")));
         agendamento.setFuncionario(funcionarioRepository.findById(dto.funcionarioId())
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado")));
-        List<Servico> servicos = servicoRepository.findAllById(dto.servicoIds());
+        List<Servico> servicos = buscarServicos(dto.servicoIds());
         agendamento.setServicos(servicos);
         agendamento.setValorTotal(servicos.stream().map(Servico::getPreco).reduce(BigDecimal.ZERO, BigDecimal::add));
         var saved = repository.save(agendamento);
@@ -114,5 +116,12 @@ public class AgendamentoService {
 
     private Agendamento buscarEntidade(Long id) {
         return repository.findById(id).orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+    }
+
+    private List<Servico> buscarServicos(List<Long> servicoIds) {
+        List<Servico> servicos = servicoRepository.findAllById(servicoIds);
+        if (servicos.size() != servicoIds.size())
+            throw new RuntimeException("Um ou mais serviços selecionados não foram encontrados.");
+        return servicos;
     }
 }

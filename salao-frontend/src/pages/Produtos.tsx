@@ -22,17 +22,20 @@ const ToggleYN = ({ value, onChange }: { value: boolean; onChange: (v: boolean) 
   </div>
 );
 
+// Preço/estoque/desconto ficam como texto enquanto o campo é editado: guardar já como number
+// faz o React reescrever o valor a cada tecla (o "." do decimal some assim que é digitado,
+// "45.9" vira "45" na hora), e a única forma confiável de mudar o valor passa a ser a setinha.
 interface FormState {
   nome: string;
-  precoVenda: number | '';
-  quantidade: number | '';
+  precoVenda: string;
+  quantidade: string;
   ativo: boolean;
   ncmShId: number | null;
   marcaId: number | null;
   unidadeMedidaId: number | null;
   categoriaId: number | null;
-  precoCusto: number | '';
-  desconto: number | '';
+  precoCusto: string;
+  desconto: string;
 }
 
 const EMPTY: FormState = {
@@ -86,15 +89,15 @@ export default function Produtos() {
     setEditId(item.id!);
     setForm({
       nome: item.nome,
-      precoVenda: item.precoVenda ?? item.preco,
-      quantidade: item.quantidade,
+      precoVenda: String(item.precoVenda ?? item.preco ?? ''),
+      quantidade: String(item.quantidade ?? ''),
       ativo: item.ativo,
       ncmShId: item.ncmSh?.id ?? item.ncmShId ?? null,
       marcaId: item.marca?.id ?? item.marcaId ?? null,
       unidadeMedidaId: item.unidadeMedida?.id ?? item.unidadeMedidaId ?? null,
       categoriaId: item.categoria?.id ?? item.categoriaId ?? null,
-      precoCusto: item.precoCusto ?? '',
-      desconto: item.desconto ?? '',
+      precoCusto: item.precoCusto != null ? String(item.precoCusto) : '',
+      desconto: item.desconto != null ? String(item.desconto) : '',
     });
     setErro('');
     formRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -106,7 +109,7 @@ export default function Produtos() {
     setErro('');
     const dto: Produto = {
       nome: form.nome,
-      precoVenda: parseFloat(String(form.precoVenda)),
+      precoVenda: parseFloat(form.precoVenda),
       quantidade: form.quantidade === '' ? 0 : Number(form.quantidade),
       ativo: form.ativo,
       ncmShId: form.ncmShId,
@@ -236,7 +239,7 @@ export default function Produtos() {
               style={inputStyle}
               placeholder="Ex: 45.90"
               value={form.precoVenda}
-              onChange={e => setForm({ ...form, precoVenda: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+              onChange={e => setForm({ ...form, precoVenda: e.target.value })}
             />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
@@ -246,7 +249,7 @@ export default function Produtos() {
               style={inputStyle}
               placeholder="Ex: 20.00"
               value={form.precoCusto}
-              onChange={e => setForm({ ...form, precoCusto: e.target.value === '' ? '' : Number(e.target.value) })}
+              onChange={e => setForm({ ...form, precoCusto: e.target.value })}
             />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
@@ -256,7 +259,7 @@ export default function Produtos() {
               style={inputStyle}
               placeholder="Ex: 10"
               value={form.quantidade}
-              onChange={e => setForm({ ...form, quantidade: e.target.value === '' ? '' : Number(e.target.value) })}
+              onChange={e => setForm({ ...form, quantidade: e.target.value })}
             />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
@@ -266,7 +269,7 @@ export default function Produtos() {
               style={inputStyle}
               placeholder="Ex: 5"
               value={form.desconto}
-              onChange={e => setForm({ ...form, desconto: e.target.value === '' ? '' : Number(e.target.value) })}
+              onChange={e => setForm({ ...form, desconto: e.target.value })}
             />
           </div>
         </div>

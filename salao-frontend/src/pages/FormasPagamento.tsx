@@ -2,12 +2,23 @@ import { useEffect, useState } from 'react';
 import { formaPagamentoService, type FormaPagamento, type FormaPagamentoRequest } from '../services/formaPagamentoService';
 import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnDelete, badge, btnNew, pageTitle, pageSubtitle, erroBanner } from '../styles/theme';
 
-const EMPTY: FormaPagamentoRequest = { formaPagamento: '', percentual: 0, numeroDias: 0, ativo: true };
+// Percentual/dias ficam como texto enquanto editados: guardar já como number faz o React
+// reescrever o valor a cada tecla (o "." do decimal some assim que é digitado, "2.5" vira "2"
+// na hora), e a única forma confiável de mudar o valor passa a ser a setinha.
+interface FormLocal {
+  id?: number;
+  formaPagamento: string;
+  percentual: string;
+  numeroDias: string;
+  ativo: boolean;
+}
+
+const EMPTY: FormLocal = { formaPagamento: '', percentual: '', numeroDias: '', ativo: true };
 
 export default function FormasPagamento() {
   const [lista, setLista] = useState<FormaPagamento[]>([]);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState<FormaPagamentoRequest & { id?: number }>(EMPTY);
+  const [form, setForm] = useState<FormLocal>(EMPTY);
   const [erro, setErro] = useState('');
 
   useEffect(() => { carregar(); }, []);
@@ -19,14 +30,25 @@ export default function FormasPagamento() {
 
   const abrirNovo = () => { setForm(EMPTY); setErro(''); setModal(true); };
   const abrirEditar = (item: FormaPagamento) => {
-    setForm({ id: item.id, formaPagamento: item.formaPagamento, percentual: item.percentual, numeroDias: item.numeroDias, ativo: item.ativo });
+    setForm({
+      id: item.id,
+      formaPagamento: item.formaPagamento,
+      percentual: item.percentual != null ? String(item.percentual) : '',
+      numeroDias: item.numeroDias != null ? String(item.numeroDias) : '',
+      ativo: item.ativo,
+    });
     setErro(''); setModal(true);
   };
 
   const salvar = async () => {
-    if (!form.formaPagamento.trim()) { setErro('Nome é obrigatório.'); return; }
+    if (!form.formaPagamento.trim()) { setErro('Forma de pagamento é obrigatória.'); return; }
     try {
-      const dto: FormaPagamentoRequest = { formaPagamento: form.formaPagamento, percentual: form.percentual, numeroDias: form.numeroDias, ativo: form.ativo };
+      const dto: FormaPagamentoRequest = {
+        formaPagamento: form.formaPagamento,
+        percentual: form.percentual === '' ? undefined : Number(form.percentual),
+        numeroDias: form.numeroDias === '' ? undefined : Number(form.numeroDias),
+        ativo: form.ativo,
+      };
       form.id ? await formaPagamentoService.atualizar(form.id, dto) : await formaPagamentoService.criar(dto);
       setModal(false); carregar();
     } catch (e: any) { setErro(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.'); }
@@ -87,11 +109,11 @@ export default function FormasPagamento() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Percentual (%)</label>
-                  <input type="number" min={0} max={100} step={0.01} style={inputStyle} placeholder="Ex: 2.50" value={form.percentual ?? ''} onChange={e => setForm({ ...form, percentual: e.target.value === '' ? undefined : Number(e.target.value) })} />
+                  <input type="number" min={0} max={100} step={0.01} style={inputStyle} placeholder="Ex: 2.50" value={form.percentual} onChange={e => setForm({ ...form, percentual: e.target.value })} />
                 </div>
                 <div>
                   <label style={labelStyle}>Nº Dias</label>
-                  <input type="number" min={0} style={inputStyle} placeholder="Ex: 30" value={form.numeroDias ?? ''} onChange={e => setForm({ ...form, numeroDias: e.target.value === '' ? undefined : Number(e.target.value) })} />
+                  <input type="number" min={0} step={1} style={inputStyle} placeholder="Ex: 30" value={form.numeroDias} onChange={e => setForm({ ...form, numeroDias: e.target.value })} />
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

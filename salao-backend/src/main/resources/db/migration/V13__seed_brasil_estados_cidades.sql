@@ -1,5 +1,5 @@
 -- Insere Brasil (se não existir)
-INSERT INTO paises (nome, sigla, moeda, ativo)
+INSERT INTO paises (pais, sigla, moeda, ativo)
 SELECT 'Brasil', 'BRA', 'Real', true
 WHERE NOT EXISTS (SELECT 1 FROM paises WHERE sigla = 'BRA');
 

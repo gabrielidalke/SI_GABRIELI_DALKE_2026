@@ -2,9 +2,11 @@ package com.salao.modules.financeiro;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -42,9 +44,16 @@ public class ContasReceberController {
         service.deletar(id);
     }
 
+    @GetMapping("/{id}/calculo-baixa")
+    public CalculoBaixa calcularBaixa(@PathVariable Long id,
+                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
+        return service.calcularRecebimento(id, data);
+    }
+
     @PostMapping("/{id}/receber")
-    public ContasReceberResponseDTO receber(@PathVariable Long id) {
-        return service.receber(id);
+    public ContasReceberResponseDTO receber(@PathVariable Long id,
+                                            @RequestBody(required = false) BaixaRequestDTO dto) {
+        return service.receber(id, dto != null ? dto.data() : null);
     }
 
     @PostMapping("/{id}/cancelar")

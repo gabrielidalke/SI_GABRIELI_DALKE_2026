@@ -1,0 +1,2 @@
+ALTER TABLE condicoes_pagamento
+    ADD COLUMN juro DECIMAL(5,2) NOT NULL DEFAULT 0;

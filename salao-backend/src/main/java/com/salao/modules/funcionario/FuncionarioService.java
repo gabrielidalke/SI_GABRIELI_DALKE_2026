@@ -30,6 +30,7 @@ public class FuncionarioService {
             if (repository.existsByCpf(dto.cpf()))
                 throw new RuntimeException("CPF já cadastrado");
         }
+        validarDatas(dto.dataNascimento(), dto.dataAdmissao(), dto.dataDemissao());
         return repository.save(Funcionario.builder()
                 .nome(dto.nome())
                 .apelido(dto.apelido())
@@ -56,6 +57,7 @@ public class FuncionarioService {
 
         if (dto.cpf() != null && !dto.cpf().isBlank() && !CpfCnpjValidator.validarCPF(dto.cpf()))
             throw new RuntimeException("CPF inválido.");
+        validarDatas(dto.dataNascimento(), dto.dataAdmissao(), dto.dataDemissao());
 
         f.setNome(dto.nome());
         f.setApelido(dto.apelido());
@@ -81,5 +83,13 @@ public class FuncionarioService {
 
     public void deletar(Long id) {
         repository.deleteById(id);
+    }
+
+    private void validarDatas(java.time.LocalDate nascimento, java.time.LocalDate admissao, java.time.LocalDate demissao) {
+        // CLT: idade mínima para trabalhar é 16 anos (fora jovem aprendiz)
+        if (nascimento != null && admissao != null && nascimento.plusYears(16).isAfter(admissao))
+            throw new RuntimeException("Funcionário precisa ter pelo menos 16 anos na data de admissão.");
+        if (demissao != null && admissao != null && demissao.isBefore(admissao))
+            throw new RuntimeException("Data de demissão não pode ser anterior à data de admissão.");
     }
 }

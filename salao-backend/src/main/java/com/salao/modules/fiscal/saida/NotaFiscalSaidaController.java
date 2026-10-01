@@ -1,6 +1,5 @@
 package com.salao.modules.fiscal.saida;
 
-import com.salao.modules.fiscal.entrada.TransporteRequestDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

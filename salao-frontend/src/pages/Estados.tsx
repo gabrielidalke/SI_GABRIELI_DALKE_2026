@@ -25,7 +25,10 @@ export default function Estados() {
   };
 
   const salvar = async () => {
-    if (!form.nome.trim() || !form.uf.trim()) { setErro('Nome e UF são obrigatórios.'); return; }
+    if (!form.nome.trim()) { setErro('Nome do estado é obrigatório.'); return; }
+    if (!form.uf.trim()) { setErro('UF é obrigatória.'); return; }
+    if (form.uf.trim().length !== 2) { setErro('UF deve ter exatamente 2 letras.'); return; }
+    if (!form.paisId) { setErro('País é obrigatório.'); return; }
     try {
       form.id ? await estadoService.atualizar(form.id, form) : await estadoService.salvar(form);
       setModal(false); carregar();
@@ -91,7 +94,7 @@ export default function Estados() {
                   <input style={inputStyle} placeholder="Ex: SP" maxLength={2} value={form.uf} onChange={e => setForm({ ...form, uf: e.target.value.toUpperCase() })} />
                 </div>
                 <div>
-                  <label style={labelStyle}>País</label>
+                  <label style={labelStyle}>País *</label>
                   <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.paisId || ''} onChange={e => setForm({ ...form, paisId: e.target.value ? Number(e.target.value) : undefined })}>
                     <option value="">Selecione</option>
                     {paises.map(p => <option key={p.id} value={p.id}>{p.nome} ({p.sigla})</option>)}

@@ -20,11 +20,17 @@ import CondicoesPagamento from './pages/CondicoesPagamento';
 import CondicaoPagamentoForm from './pages/condicao/CondicaoPagamentoForm';
 import Fornecedores from './pages/Fornecedores';
 import FornecedorForm from './pages/fornecedor/FornecedorForm';
+import Transportadoras from './pages/Transportadoras';
+import TransportadoraForm from './pages/transportadora/TransportadoraForm';
 import ContasPagar from './pages/ContasPagar';
 import ContasReceber from './pages/ContasReceber';
 import NcmSh from './pages/NcmSh';
-import Compras from './pages/Compras';
-import NotasFiscaisEntrada from './pages/NotasFiscaisEntrada';
+import ClassificacoesConta from './pages/ClassificacoesConta';
+import NotasEntrada from './pages/NotasEntrada';
+import NotaEntradaForm from './pages/nota/NotaEntradaForm';
+import PedidosCompra from './pages/PedidosCompra';
+import PedidoCompraForm from './pages/pedido/PedidoCompraForm';
+import EstoqueMovimentacoes from './pages/EstoqueMovimentacoes';
 import Vendas from './pages/Vendas';
 import NotasFiscaisSaida from './pages/NotasFiscaisSaida';
 import NotasFiscaisServico from './pages/NotasFiscaisServico';
@@ -47,6 +53,7 @@ export default function App() {
             <Route path="/produtos" element={<Produtos />} />
             <Route path="/marcas" element={<Marcas />} />
             <Route path="/unidades-medida" element={<UnidadesMedida />} />
+            <Route path="/estoque" element={<EstoqueMovimentacoes />} />
             <Route path="/clientes" element={<ClienteList />} />
             <Route path="/clientes/novo" element={<ClienteForm />} />
             <Route path="/clientes/editar/:id" element={<ClienteForm />} />
@@ -59,6 +66,9 @@ export default function App() {
             <Route path="/fornecedores" element={<Fornecedores />} />
             <Route path="/fornecedores/novo" element={<FornecedorForm />} />
             <Route path="/fornecedores/editar/:id" element={<FornecedorForm />} />
+            <Route path="/transportadoras" element={<Transportadoras />} />
+            <Route path="/transportadoras/nova" element={<TransportadoraForm />} />
+            <Route path="/transportadoras/editar/:id" element={<TransportadoraForm />} />
             <Route path="/formas-pagamento" element={<FormasPagamento />} />
             <Route path="/condicoes-pagamento" element={<CondicoesPagamento />} />
             <Route path="/condicoes-pagamento/nova" element={<CondicaoPagamentoForm />} />
@@ -66,8 +76,13 @@ export default function App() {
             <Route path="/contas-pagar" element={<ContasPagar />} />
             <Route path="/contas-receber" element={<ContasReceber />} />
             <Route path="/ncm-sh" element={<NcmSh />} />
-            <Route path="/compras" element={<Compras />} />
-            <Route path="/notas-fiscais-entrada" element={<NotasFiscaisEntrada />} />
+            <Route path="/classificacoes-conta" element={<ClassificacoesConta />} />
+            <Route path="/pedidos-compra" element={<PedidosCompra />} />
+            <Route path="/pedidos-compra/novo" element={<PedidoCompraForm />} />
+            <Route path="/pedidos-compra/:modelo/:serie/:numero/:fornecedorId" element={<PedidoCompraForm />} />
+            <Route path="/notas-entrada" element={<NotasEntrada />} />
+            <Route path="/notas-entrada/nova" element={<NotaEntradaForm />} />
+            <Route path="/notas-entrada/:modelo/:serie/:numero/:fornecedorId" element={<NotaEntradaForm />} />
             <Route path="/vendas" element={<Vendas />} />
             <Route path="/notas-fiscais-saida" element={<NotasFiscaisSaida />} />
             <Route path="/notas-fiscais-servico" element={<NotasFiscaisServico />} />

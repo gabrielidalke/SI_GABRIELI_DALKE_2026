@@ -9,9 +9,9 @@ import java.math.BigDecimal;
 
 public record ServicoDTO(
         Long id,
-        @NotBlank String nome,
+        @NotBlank(message = "Nome do serviço é obrigatório") String nome,
         String descricao,
-        @NotNull @Positive Integer duracaoMin,
-        @NotNull @Positive BigDecimal preco,
+        @NotNull(message = "Duração é obrigatória") @Positive(message = "Duração deve ser maior que zero") Integer duracaoMin,
+        @NotNull(message = "Preço é obrigatório") @Positive(message = "Preço deve ser maior que zero") BigDecimal preco,
         Boolean ativo
 ) {}

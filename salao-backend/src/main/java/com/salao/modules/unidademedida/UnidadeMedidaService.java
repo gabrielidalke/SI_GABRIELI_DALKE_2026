@@ -22,6 +22,8 @@ public class UnidadeMedidaService {
     }
 
     public UnidadeMedidaResponseDTO criar(UnidadeMedidaRequestDTO dto) {
+        if (repository.existsBySiglaIgnoreCase(dto.sigla()))
+            throw new RuntimeException("Já existe uma unidade de medida com essa sigla");
         var unidade = UnidadeMedida.builder()
                 .unidadeMedida(dto.unidadeMedida())
                 .sigla(dto.sigla())
@@ -32,6 +34,8 @@ public class UnidadeMedidaService {
 
     public UnidadeMedidaResponseDTO atualizar(Long id, UnidadeMedidaRequestDTO dto) {
         var unidade = buscarEntidade(id);
+        if (!unidade.getSigla().equalsIgnoreCase(dto.sigla()) && repository.existsBySiglaIgnoreCase(dto.sigla()))
+            throw new RuntimeException("Já existe uma unidade de medida com essa sigla");
         unidade.setUnidadeMedida(dto.unidadeMedida());
         unidade.setSigla(dto.sigla());
         if (dto.ativo() != null) unidade.setAtivo(dto.ativo());

@@ -51,6 +51,8 @@ public class ProdutoService {
 
     public ProdutoResponseDTO atualizar(Long id, ProdutoDTO dto) {
         Produto p = buscarEntidade(id);
+        if (!p.getNome().equalsIgnoreCase(dto.nome()) && repository.existsByNomeIgnoreCase(dto.nome()))
+            throw new RuntimeException("Produto já cadastrado");
         p.setNome(dto.nome());
         p.setDescricao(dto.descricao());
         p.setPrecoVenda(dto.precoVenda());

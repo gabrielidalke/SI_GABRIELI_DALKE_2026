@@ -22,6 +22,8 @@ public class MarcaService {
     }
 
     public MarcaResponseDTO criar(MarcaRequestDTO dto) {
+        if (repository.existsByMarcaIgnoreCase(dto.marca()))
+            throw new RuntimeException("Marca já cadastrada");
         var marca = Marca.builder()
                 .marca(dto.marca())
                 .ativo(dto.ativo() != null ? dto.ativo() : true)
@@ -31,6 +33,8 @@ public class MarcaService {
 
     public MarcaResponseDTO atualizar(Long id, MarcaRequestDTO dto) {
         var marca = buscarEntidade(id);
+        if (!marca.getMarca().equalsIgnoreCase(dto.marca()) && repository.existsByMarcaIgnoreCase(dto.marca()))
+            throw new RuntimeException("Marca já cadastrada");
         marca.setMarca(dto.marca());
         if (dto.ativo() != null) marca.setAtivo(dto.ativo());
         return MarcaResponseDTO.from(repository.save(marca));

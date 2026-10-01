@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Cliente } from '../../services/clienteService';
 import { clienteService } from '../../services/clienteService';
 import type { CondicaoPagamento } from '../../services/condicaoPagamentoService';
 import { condicaoPagamentoService } from '../../services/condicaoPagamentoService';
-import { inputStyle, labelStyle, card, pageTitle, pageSubtitle } from '../../styles/theme';
+import { inputStyle, labelStyle, card, pageTitle, pageSubtitle, erroBanner } from '../../styles/theme';
 import CidadeAutocomplete from '../../components/CidadeAutocomplete';
 
 const sel: CSSProperties = { ...inputStyle, cursor: 'pointer' };
@@ -37,6 +37,14 @@ export default function ClienteForm() {
   const navigate = useNavigate();
   const [form, setForm] = useState<Cliente>({ nome: '', ativo: true });
   const [condicoes, setCondicoes] = useState<CondicaoPagamento[]>([]);
+  const [erro, setErro] = useState('');
+  const topoRef = useRef<HTMLDivElement>(null);
+
+  // O formulário é longo: rola até o topo para a mensagem não ficar escondida
+  const mostrarErro = (msg: string) => {
+    setErro(msg);
+    topoRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
     condicaoPagamentoService.listar().then(r => setCondicoes(r.data));
@@ -48,27 +56,48 @@ export default function ClienteForm() {
     }
   }, [id]);
 
-  const set = (changes: Partial<Cliente>) => setForm(prev => ({ ...prev, ...changes }));
+  // Limpa o erro ao editar qualquer campo, para uma mensagem de uma tentativa
+  // anterior não continuar na tela como se ainda valesse para o valor atual
+  const set = (changes: Partial<Cliente>) => {
+    setForm(prev => ({ ...prev, ...changes }));
+    setErro('');
+  };
 
   const salvar = async () => {
-    const payload = { ...form, cidadeId: (form as any).cidadeId || null };
+    if (form.nome.trim().length < 3) { mostrarErro('Nome do cliente deve ter pelo menos 3 letras.'); return; }
+    if (!form.endereco?.trim()) { mostrarErro('Endereço é obrigatório.'); return; }
+    if (!form.numero?.trim()) { mostrarErro('Número é obrigatório.'); return; }
+    if (!form.cep?.trim()) { mostrarErro('CEP é obrigatório.'); return; }
+    if (!form.bairro?.trim()) { mostrarErro('Bairro é obrigatório.'); return; }
+    if (!(form as any).cidadeId) { mostrarErro('Cidade é obrigatória.'); return; }
+    if (!form.telefone?.trim()) { mostrarErro('Telefone é obrigatório.'); return; }
+    if (!form.email?.trim()) { mostrarErro('E-mail é obrigatório.'); return; }
+    // trim() nos campos com formato fixo (telefone/CEP) evita espaço colado no início/fim reprovar a validação
+    const payload = {
+      ...form,
+      telefone: form.telefone?.trim(),
+      email: form.email?.trim(),
+      cep: form.cep?.trim(),
+      cidadeId: (form as any).cidadeId || null,
+    };
     try {
       if (id) await clienteService.atualizar(Number(id), payload as any);
       else await clienteService.salvar(payload as any);
       navigate('/clientes');
     } catch (e: any) {
-      alert(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.');
+      mostrarErro(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.');
     }
   };
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+    <div ref={topoRef} style={{ padding: 32, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       <div style={{ marginBottom: 32 }}>
         <h2 style={pageTitle}>{id ? 'Editar' : 'Novo'} Cliente</h2>
         <p style={pageSubtitle}>{id ? 'Atualize os dados do cliente' : 'Preencha os dados do novo cliente'}</p>
       </div>
 
       <div style={{ ...card, padding: 32 }}>
+        {erro && <p style={erroBanner}>{erro}</p>}
 
         {/* ─── Dados Principais ─── */}
         <SectionHeader label="Dados Principais" />

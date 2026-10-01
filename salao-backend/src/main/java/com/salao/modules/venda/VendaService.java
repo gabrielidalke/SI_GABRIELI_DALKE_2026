@@ -3,6 +3,7 @@ package com.salao.modules.venda;
 import com.salao.modules.cliente.ClienteRepository;
 import com.salao.modules.fiscal.saida.NotaFiscalSaidaResponseDTO;
 import com.salao.modules.fiscal.saida.NotaFiscalSaidaService;
+import com.salao.modules.pagamento.CondicaoPagamentoRepository;
 import com.salao.modules.produto.ProdutoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class VendaService {
     private final VendaRepository repository;
     private final ClienteRepository clienteRepository;
     private final ProdutoRepository produtoRepository;
+    private final CondicaoPagamentoRepository condicaoPagamentoRepository;
     private final NotaFiscalSaidaService notaFiscalSaidaService;
 
     public List<VendaResponseDTO> listar() {
@@ -30,6 +32,7 @@ public class VendaService {
 
     @Transactional
     public VendaResponseDTO criar(VendaRequestDTO dto) {
+        validarData(dto.dataVenda());
         var cliente = clienteRepository.findById(dto.clienteId())
                 .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
 
@@ -38,6 +41,7 @@ public class VendaService {
                 .dataVenda(dto.dataVenda())
                 .observacao(dto.observacao())
                 .cliente(cliente)
+                .condicaoPagamento(resolveCondicaoPagamento(dto.condicaoPagamentoId()))
                 .build();
 
         var itens = dto.itens().stream().map(itemDto -> {
@@ -68,6 +72,7 @@ public class VendaService {
         var venda = buscarEntidade(id);
         if (!"RASCUNHO".equals(venda.getStatus()))
             throw new RuntimeException("Venda não pode ser editada no status atual");
+        validarData(dto.dataVenda());
 
         var cliente = clienteRepository.findById(dto.clienteId())
                 .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
@@ -76,6 +81,7 @@ public class VendaService {
         venda.setDataVenda(dto.dataVenda());
         venda.setObservacao(dto.observacao());
         venda.setCliente(cliente);
+        venda.setCondicaoPagamento(resolveCondicaoPagamento(dto.condicaoPagamentoId()));
         venda.getItens().clear();
 
         var itens = dto.itens().stream().map(itemDto -> {
@@ -130,6 +136,17 @@ public class VendaService {
         venda.setStatus("NFE_GERADA");
         repository.save(venda);
         return NotaFiscalSaidaResponseDTO.from(nota);
+    }
+
+    private void validarData(java.time.LocalDate dataVenda) {
+        if (dataVenda.isAfter(java.time.LocalDate.now()))
+            throw new RuntimeException("Data da venda não pode ser posterior à data atual");
+    }
+
+    private com.salao.modules.pagamento.CondicaoPagamento resolveCondicaoPagamento(Long id) {
+        if (id == null) return null;
+        return condicaoPagamentoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Condição de pagamento não encontrada"));
     }
 
     private Venda buscarEntidade(Long id) {

@@ -35,6 +35,8 @@ public class FormaPagamentoService {
 
     public FormaPagamentoResponseDTO atualizar(Long id, FormaPagamentoRequestDTO dto) {
         var fp = buscarEntidade(id);
+        if (!fp.getFormaPagamento().equalsIgnoreCase(dto.formaPagamento()) && repository.existsByFormaPagamento(dto.formaPagamento()))
+            throw new RuntimeException("Forma de pagamento já cadastrada");
         fp.setFormaPagamento(dto.formaPagamento());
         if (dto.percentual() != null) fp.setPercentual(dto.percentual());
         if (dto.numeroDias() != null) fp.setNumeroDias(dto.numeroDias());

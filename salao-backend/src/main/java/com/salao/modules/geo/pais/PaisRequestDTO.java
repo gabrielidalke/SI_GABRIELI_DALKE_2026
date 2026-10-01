@@ -9,7 +9,7 @@ public record PaisRequestDTO(
         String nome,
 
         @NotBlank(message = "Sigla é obrigatória")
-        @Size(max = 3)
+        @Size(min = 2, max = 3, message = "Sigla deve ter 2 ou 3 letras")
         String sigla,
 
         @Size(max = 100)

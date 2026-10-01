@@ -25,7 +25,8 @@ export default function Cidades() {
   };
 
   const salvar = async () => {
-    if (!form.nome.trim()) { setErro('Nome é obrigatório.'); return; }
+    if (!form.nome.trim()) { setErro('Nome da cidade é obrigatório.'); return; }
+    if (!form.estadoId) { setErro('Estado é obrigatório.'); return; }
     try {
       form.id ? await cidadeService.atualizar(form.id, form) : await cidadeService.salvar(form);
       setModal(false); carregar();
@@ -86,7 +87,7 @@ export default function Cidades() {
                 <input style={inputStyle} placeholder="Nome da cidade..." value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
               </div>
               <div>
-                <label style={labelStyle}>Estado</label>
+                <label style={labelStyle}>Estado *</label>
                 <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.estadoId || ''} onChange={e => setForm({ ...form, estadoId: e.target.value ? Number(e.target.value) : undefined })}>
                   <option value="">Selecione</option>
                   {estados.map(e => <option key={e.id} value={e.id}>{e.nome} ({e.uf})</option>)}

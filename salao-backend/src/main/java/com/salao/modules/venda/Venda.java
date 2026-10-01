@@ -1,6 +1,7 @@
 package com.salao.modules.venda;
 
 import com.salao.modules.cliente.Cliente;
+import com.salao.modules.pagamento.CondicaoPagamento;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -52,6 +53,10 @@ public class Venda {
     @ManyToOne
     @JoinColumn(name = "cliente_id")
     private Cliente cliente;
+
+    @ManyToOne
+    @JoinColumn(name = "condicao_pagamento_id")
+    private CondicaoPagamento condicaoPagamento;
 
     @Builder.Default
     @ToString.Exclude

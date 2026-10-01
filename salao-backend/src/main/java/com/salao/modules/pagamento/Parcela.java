@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -24,6 +25,10 @@ public class Parcela {
 
     @Column(name = "dias_vencimento", nullable = false)
     private Integer diasVencimento;
+
+    @Builder.Default
+    @Column(precision = 5, scale = 2)
+    private BigDecimal percentual = BigDecimal.ZERO;
 
     @Builder.Default
     private Boolean ativo = true;

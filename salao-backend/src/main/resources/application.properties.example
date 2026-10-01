@@ -1,0 +1,22 @@
+# Copie este arquivo para "application.properties" (fora do versionamento) e ajuste os valores.
+#
+# Padrão do projeto: banco criado manualmente a partir de schema.sql (não usamos Flyway
+# como fonte de verdade — o professor exige criação manual do banco). As migrations em
+# db/migration/ ficam no repo só como referência/histórico, com spring.flyway.enabled=false.
+
+spring.datasource.url=jdbc:postgresql://localhost:5432/salao_db
+spring.datasource.username=postgres
+spring.datasource.password=troque_pela_sua_senha
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.flyway.enabled=false
+server.port=8080
+server.error.include-message=always
+server.error.include-binding-errors=always
+
+# Alternativa via Docker (Postgres isolado, porta 5433 pra não colidir com uma instalação
+# nativa na 5432): docker compose up -d (usa o docker-compose.yml deste diretório) e troque
+# a url/porta acima e senha para postgres/postgres. Nesse caso pode reativar o Flyway
+# (spring.flyway.enabled=true) já que é um banco novo, sem schema manual prévio.

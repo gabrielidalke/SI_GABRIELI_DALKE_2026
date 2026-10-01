@@ -23,22 +23,26 @@ const aBtn = (bg: string, color: string): CSSProperties => ({
 });
 
 interface ClienteOpt { id: number; nome: string; }
-interface ProdutoOpt { id: number; nome: string; preco: number; }
+interface ProdutoOpt { id: number; nome: string; precoVenda: number; }
+interface CondicaoPagamentoOpt { id: number; condicao: string; }
 
+// Quantidade/preço ficam como texto enquanto editados: guardar já como number faz o React
+// reescrever o valor a cada tecla (o "." do decimal some assim que é digitado, "35.5" vira
+// "35" na hora), e a única forma confiável de mudar o valor passa a ser a setinha.
 interface ItemLocal {
   _key: number;
   produtoId: number | '';
-  quantidade: number;
-  precoUnitario: number;
+  quantidade: string;
+  precoUnitario: string;
 }
 
-const EMPTY_FORM = { numeroVenda: '', dataVenda: '', clienteId: '' as number | '', observacao: '' };
+const EMPTY_FORM = { numeroVenda: '', dataVenda: '', clienteId: '' as number | '', condicaoPagamentoId: '' as number | '', observacao: '' };
 
 export default function Vendas() {
   const navigate = useNavigate();
   const keyRef = useRef(0);
   const nextKey = () => ++keyRef.current;
-  const emptyItem = (): ItemLocal => ({ _key: nextKey(), produtoId: '', quantidade: 1, precoUnitario: 0 });
+  const emptyItem = (): ItemLocal => ({ _key: nextKey(), produtoId: '', quantidade: '1', precoUnitario: '' });
 
   const [lista,    setLista]    = useState<Venda[]>([]);
   const [modal,    setModal]    = useState(false);
@@ -49,6 +53,7 @@ export default function Vendas() {
   const [erro,     setErro]     = useState('');
   const [clientes, setClientes] = useState<ClienteOpt[]>([]);
   const [produtos, setProdutos] = useState<ProdutoOpt[]>([]);
+  const [condicoes, setCondicoes] = useState<CondicaoPagamentoOpt[]>([]);
 
   useEffect(() => { carregar(); }, []);
 
@@ -59,12 +64,14 @@ export default function Vendas() {
 
   const carregarOpcoes = async () => {
     try {
-      const [c, p] = await Promise.all([
+      const [c, p, cp] = await Promise.all([
         axios.get<ClienteOpt[]>(`${API}/clientes`),
         axios.get<ProdutoOpt[]>(`${API}/produtos`),
+        axios.get<CondicaoPagamentoOpt[]>(`${API}/condicoes-pagamento`),
       ]);
       setClientes(c.data);
       setProdutos(p.data);
+      setCondicoes(cp.data);
     } catch (e) { console.error('Erro ao carregar opções:', e); }
   };
 
@@ -81,14 +88,15 @@ export default function Vendas() {
       numeroVenda: venda.numeroVenda,
       dataVenda:   venda.dataVenda,
       clienteId:   venda.cliente?.id ?? '',
+      condicaoPagamentoId: venda.condicaoPagamento?.id ?? '',
       observacao:  venda.observacao || '',
     });
     setItens(
       (venda.itens || []).map(i => ({
         _key:          nextKey(),
         produtoId:     i.produto?.id ?? i.produtoId ?? '',
-        quantidade:    i.quantidade,
-        precoUnitario: i.precoUnitario,
+        quantidade:    String(i.quantidade),
+        precoUnitario: String(i.precoUnitario),
       }))
     );
     setErro(''); setModoVer(ver); setEditId(venda.id); setModal(true);
@@ -101,30 +109,34 @@ export default function Vendas() {
     setItens(prev => prev.map(i => {
       if (i._key !== key) return i;
       const next = { ...i, ...updates };
-      if ('produtoId' in updates && updates.produtoId && i.precoUnitario === 0) {
+      if ('produtoId' in updates && updates.produtoId && !i.precoUnitario) {
         const prod = produtos.find(p => p.id === Number(updates.produtoId));
-        if (prod) next.precoUnitario = prod.preco;
+        if (prod) next.precoUnitario = String(prod.precoVenda);
       }
       return next;
     }));
   };
 
-  const total = itens.reduce((s, i) => s + (i.quantidade || 0) * (i.precoUnitario || 0), 0);
+  const total = itens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.precoUnitario) || 0), 0);
 
   const salvar = async () => {
     if (!form.numeroVenda.trim()) { setErro('Nº Venda é obrigatório.'); return; }
     if (!form.dataVenda)          { setErro('Data é obrigatória.'); return; }
+    if (!form.clienteId)          { setErro('Cliente é obrigatório.'); return; }
     if (itens.length === 0)       { setErro('Adicione pelo menos um item.'); return; }
     if (itens.some(i => !i.produtoId)) { setErro('Selecione o produto em todos os itens.'); return; }
+    if (itens.some(i => !i.quantidade || Number(i.quantidade) <= 0)) { setErro('Quantidade deve ser maior que zero em todos os itens.'); return; }
+    if (itens.some(i => i.precoUnitario === '' || Number(i.precoUnitario) < 0)) { setErro('Preço unitário é obrigatório em todos os itens.'); return; }
     const dto: VendaRequest = {
       numeroVenda: form.numeroVenda,
       dataVenda:   form.dataVenda,
       clienteId:   form.clienteId ? Number(form.clienteId) : null,
+      condicaoPagamentoId: form.condicaoPagamentoId ? Number(form.condicaoPagamentoId) : null,
       observacao:  form.observacao,
       itens: itens.map(i => ({
         produtoId:     Number(i.produtoId),
-        quantidade:    i.quantidade,
-        precoUnitario: i.precoUnitario,
+        quantidade:    Number(i.quantidade),
+        precoUnitario: Number(i.precoUnitario),
       })),
     };
     try {
@@ -239,10 +251,17 @@ export default function Vendas() {
                 <input type="date" style={inputStyle} value={form.dataVenda} onChange={e => setForm({ ...form, dataVenda: e.target.value })} disabled={modoVer} />
               </div>
               <div style={{ gridColumn: 'span 4' }}>
-                <label style={labelStyle}>Cliente</label>
+                <label style={labelStyle}>Cliente *</label>
                 <select style={sel} value={form.clienteId} onChange={e => setForm({ ...form, clienteId: e.target.value ? Number(e.target.value) : '' })} disabled={modoVer}>
                   <option value="">Selecione o cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+              <div style={{ gridColumn: 'span 4' }}>
+                <label style={labelStyle}>Condição de Pagamento</label>
+                <select style={sel} value={form.condicaoPagamentoId} onChange={e => setForm({ ...form, condicaoPagamentoId: e.target.value ? Number(e.target.value) : '' })} disabled={modoVer}>
+                  <option value="">Selecione</option>
+                  {condicoes.map(c => <option key={c.id} value={c.id}>{c.condicao}</option>)}
                 </select>
               </div>
               <div style={{ gridColumn: 'span 12' }}>
@@ -261,7 +280,7 @@ export default function Vendas() {
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
               <thead>
                 <tr style={{ backgroundColor: '#FDF0E8' }}>
-                  {['Produto', 'Quantidade', 'Preço Unit. (R$)', 'Subtotal'].map(h => (
+                  {['Produto *', 'Quantidade *', 'Preço Unit. (R$) *', 'Subtotal'].map(h => (
                     <th key={h} style={{ ...th, padding: '8px 12px' }}>{h}</th>
                   ))}
                   {!modoVer && <th style={{ ...th, padding: '8px 12px', width: 36 }} />}
@@ -269,7 +288,7 @@ export default function Vendas() {
               </thead>
               <tbody>
                 {itens.map(item => {
-                  const sub = (item.quantidade || 0) * (item.precoUnitario || 0);
+                  const sub = (Number(item.quantidade) || 0) * (Number(item.precoUnitario) || 0);
                   return (
                     <tr key={item._key} style={{ borderTop: '1px solid #F0E6DC' }}>
                       <td style={{ padding: '8px 10px' }}>
@@ -288,7 +307,7 @@ export default function Vendas() {
                           type="number" min={1} step={1}
                           style={{ ...inputStyle, fontSize: 13, padding: '7px 10px' }}
                           value={item.quantidade}
-                          onChange={e => updateItem(item._key, { quantidade: Number(e.target.value) })}
+                          onChange={e => updateItem(item._key, { quantidade: e.target.value })}
                           disabled={modoVer}
                         />
                       </td>
@@ -296,8 +315,8 @@ export default function Vendas() {
                         <input
                           type="number" min={0} step={0.01}
                           style={{ ...inputStyle, fontSize: 13, padding: '7px 10px' }}
-                          value={item.precoUnitario || ''}
-                          onChange={e => updateItem(item._key, { precoUnitario: Number(e.target.value) })}
+                          value={item.precoUnitario}
+                          onChange={e => updateItem(item._key, { precoUnitario: e.target.value })}
                           disabled={modoVer}
                         />
                       </td>

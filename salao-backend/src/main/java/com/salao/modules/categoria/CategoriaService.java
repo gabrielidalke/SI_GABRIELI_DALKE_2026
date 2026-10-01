@@ -30,6 +30,8 @@ public class CategoriaService {
 
     public Categoria atualizar(Long id, CategoriaDTO dto) {
         Categoria cat = buscarPorId(id);
+        if (!cat.getNome().equalsIgnoreCase(dto.nome()) && repository.existsByNomeIgnoreCase(dto.nome()))
+            throw new RuntimeException("Categoria já cadastrada");
         cat.setNome(dto.nome());
         cat.setAtivo(dto.ativo());
         return repository.save(cat);

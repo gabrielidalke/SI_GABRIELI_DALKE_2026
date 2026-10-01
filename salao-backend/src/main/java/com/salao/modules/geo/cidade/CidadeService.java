@@ -33,6 +33,8 @@ public class CidadeService {
     }
 
     public CidadeResponseDTO salvar(CidadeRequestDTO dto) {
+        if (dto.estadoId() != null && repository.existsByNomeIgnoreCaseAndEstadoId(dto.nome(), dto.estadoId()))
+            throw new RuntimeException("Essa cidade já está cadastrada para o estado selecionado");
         Cidade cidade = Cidade.builder()
                 .nome(dto.nome())
                 .ativo(dto.ativo() != null ? dto.ativo() : true)
@@ -47,6 +49,8 @@ public class CidadeService {
 
     public CidadeResponseDTO atualizar(Long id, CidadeRequestDTO dto) {
         Cidade cidade = buscarEntidade(id);
+        if (dto.estadoId() != null && repository.existsByNomeIgnoreCaseAndEstadoIdAndIdNot(dto.nome(), dto.estadoId(), id))
+            throw new RuntimeException("Essa cidade já está cadastrada para o estado selecionado");
         cidade.setNome(dto.nome());
         if (dto.ativo() != null) cidade.setAtivo(dto.ativo());
         if (dto.estadoId() != null) {

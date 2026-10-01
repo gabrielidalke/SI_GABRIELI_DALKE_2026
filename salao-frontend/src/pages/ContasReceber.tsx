@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import axios from 'axios';
 import { contasReceberService, type ContaReceber, type ContaReceberRequest } from '../services/contasReceberService';
+import BaixaContaModal from '../components/BaixaContaModal';
 import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnDelete, btnNew, pageTitle, pageSubtitle, erroBanner } from '../styles/theme';
 
 const API = 'http://localhost:8080/api';
@@ -9,7 +10,20 @@ const API = 'http://localhost:8080/api';
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 20 };
 const sel = { ...inputStyle, cursor: 'pointer' };
 
-const EMPTY: ContaReceberRequest = { descricao: '', clienteId: null, valor: 0, dataVencimento: '', parcelaId: null, ativo: true };
+// Valor fica como texto enquanto editado: guardar já como number faz o React reescrever
+// o valor a cada tecla (o "." do decimal some assim que é digitado, "150.5" vira "150" na
+// hora), e a única forma confiável de mudar o valor passa a ser a setinha.
+interface FormLocal {
+  id?: number;
+  descricao: string;
+  clienteId: number | null;
+  valor: string;
+  dataVencimento: string;
+  parcelaId: number | null;
+  ativo: boolean;
+}
+
+const EMPTY: FormLocal = { descricao: '', clienteId: null, valor: '', dataVencimento: '', parcelaId: null, ativo: true };
 
 const sitCfg: Record<string, { label: string; bg: string; color: string }> = {
   ABERTA:    { label: 'Aberta',    bg: '#FFF3CD', color: '#856404' },
@@ -24,16 +38,21 @@ const aBtn = (bg: string, color: string, border?: string): CSSProperties => ({
 });
 
 interface ClienteOpt { id: number; nome: string; }
-interface ParcelaOpt  { id: number; numeroDias: number; }
+interface ParcelaOpt  { id: number; numeroParcela: number; diasVencimento: number; condicaoPagamento?: { id: number; condicao: string }; }
+
+const brl = (v?: number) => `R$ ${Number(v ?? 0).toFixed(2)}`;
+const sub: CSSProperties = { display: 'block', fontSize: 11, color: '#8B6E63', fontWeight: 400, marginTop: 2 };
 
 export default function ContasReceber() {
   const [lista,    setLista]    = useState<ContaReceber[]>([]);
   const [modal,    setModal]    = useState(false);
-  const [form,     setForm]     = useState<ContaReceberRequest & { id?: number }>(EMPTY);
+  const [form,     setForm]     = useState<FormLocal>(EMPTY);
   const [erro,     setErro]     = useState('');
   const [clientes, setClientes] = useState<ClienteOpt[]>([]);
   const [parcelas, setParcelas] = useState<ParcelaOpt[]>([]);
   const [modoVer,  setModoVer]  = useState(false);
+  const [contaVer, setContaVer] = useState<ContaReceber | null>(null);
+  const [baixa,    setBaixa]    = useState<ContaReceber | null>(null);
 
   useEffect(() => { carregar(); }, []);
 
@@ -60,28 +79,32 @@ export default function ContasReceber() {
     setForm({
       id: item.id, descricao: item.descricao,
       clienteId: item.cliente?.id ?? null,
-      valor: item.valor, dataVencimento: item.dataVencimento,
+      valor: String(item.valor), dataVencimento: item.dataVencimento,
       parcelaId: item.parcela?.id ?? null, ativo: item.ativo,
     });
+    setContaVer(ver ? item : null);
     setErro(''); setModoVer(ver); setModal(true);
   };
 
   const salvar = async () => {
     if (!form.descricao.trim()) { setErro('Descrição é obrigatória.'); return; }
-    if (!form.valor || form.valor <= 0) { setErro('Valor deve ser maior que zero.'); return; }
+    if (!form.valor || Number(form.valor) <= 0) { setErro('Valor deve ser maior que zero.'); return; }
     if (!form.dataVencimento) { setErro('Data de vencimento é obrigatória.'); return; }
+    if (!form.clienteId) { setErro('Cliente é obrigatório.'); return; }
+    const dto: ContaReceberRequest = {
+      descricao: form.descricao,
+      clienteId: form.clienteId,
+      valor: Number(form.valor),
+      dataVencimento: form.dataVencimento,
+      parcelaId: form.parcelaId,
+      ativo: form.ativo,
+    };
     try {
       form.id
-        ? await contasReceberService.atualizar(form.id, form)
-        : await contasReceberService.criar(form);
+        ? await contasReceberService.atualizar(form.id, dto)
+        : await contasReceberService.criar(dto);
       setModal(false); carregar();
     } catch (e: any) { setErro(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.'); }
-  };
-
-  const handleReceber = async (id: number) => {
-    if (!confirm('Confirmar recebimento desta conta?')) return;
-    try { await contasReceberService.receber(id); carregar(); }
-    catch (e: any) { alert(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao registrar recebimento.'); }
   };
 
   const handleCancelar = async (id: number) => {
@@ -110,7 +133,7 @@ export default function ContasReceber() {
         <table className="salon-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#FDF0E8' }}>
-              {['ID', 'Descrição', 'Cliente', 'Valor (R$)', 'Vencimento', 'Situação'].map(h => (
+              {['ID', 'Descrição', 'Cliente', 'Valor (R$)', 'Vencimento', 'Recebido (R$)', 'Situação'].map(h => (
                 <th key={h} style={th}>{h}</th>
               ))}
               <th style={{ ...th, minWidth: 200 }}>Ações</th>
@@ -124,8 +147,19 @@ export default function ContasReceber() {
                   <td style={{ ...td, color: '#8B6E63' }}>{conta.id}</td>
                   <td style={{ ...td, fontWeight: 500 }}>{conta.descricao}</td>
                   <td style={td}>{conta.cliente?.nome || '—'}</td>
-                  <td style={{ ...td, color: '#C97B6B', fontWeight: 600 }}>R$ {Number(conta.valor).toFixed(2)}</td>
+                  <td style={{ ...td, color: '#C97B6B', fontWeight: 600 }}>
+                    {brl(conta.valor)}
+                    {conta.situacao === 'ABERTA' && conta.percentualDesconto > 0 && (
+                      <span style={sub}>{brl(conta.valorComDesconto)} até o venc.</span>
+                    )}
+                  </td>
                   <td style={td}>{conta.dataVencimento}</td>
+                  <td style={{ ...td, fontWeight: 600 }}>
+                    {conta.situacao === 'RECEBIDA' ? (<>
+                      {brl(conta.valorRecebido)}
+                      <span style={sub}>em {conta.dataRecebimento}</span>
+                    </>) : '—'}
+                  </td>
                   <td style={td}>
                     <span style={{ backgroundColor: sc.bg, color: sc.color, padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
                       {sc.label}
@@ -133,7 +167,7 @@ export default function ContasReceber() {
                   </td>
                   <td style={td}>
                     {conta.situacao === 'ABERTA' && (<>
-                      <button style={aBtn('#D4EDDA', '#2D6A4F')} onClick={() => handleReceber(conta.id)}>Receber</button>
+                      <button style={aBtn('#D4EDDA', '#2D6A4F')} onClick={() => setBaixa(conta)}>Receber</button>
                       <button style={aBtn('#F8D7DA', '#721C24')} onClick={() => handleCancelar(conta.id)}>Cancelar</button>
                       <button style={{ ...btnEdit, marginRight: 0 }} onClick={() => abrirEditar(conta)}>Editar</button>
                     </>)}
@@ -174,14 +208,14 @@ export default function ContasReceber() {
               </div>
               <div style={{ gridColumn: 'span 4' }}>
                 <label style={labelStyle}>Valor (R$) *</label>
-                <input type="number" min={0} step={0.01} style={inputStyle} placeholder="0,00" value={form.valor || ''} onChange={e => setForm({ ...form, valor: Number(e.target.value) })} disabled={modoVer} />
+                <input type="number" min={0} step={0.01} style={inputStyle} placeholder="0,00" value={form.valor} onChange={e => setForm({ ...form, valor: e.target.value })} disabled={modoVer} />
               </div>
               <div style={{ gridColumn: 'span 4' }}>
                 <label style={labelStyle}>Data de Vencimento *</label>
                 <input type="date" style={inputStyle} value={form.dataVencimento} onChange={e => setForm({ ...form, dataVencimento: e.target.value })} disabled={modoVer} />
               </div>
               <div style={{ gridColumn: 'span 4' }}>
-                <label style={labelStyle}>Cliente</label>
+                <label style={labelStyle}>Cliente *</label>
                 <select style={sel} value={form.clienteId || ''} onChange={e => setForm({ ...form, clienteId: e.target.value ? Number(e.target.value) : null })} disabled={modoVer}>
                   <option value="">Selecione o cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
@@ -191,14 +225,36 @@ export default function ContasReceber() {
                 <label style={labelStyle}>Parcela</label>
                 <select style={sel} value={form.parcelaId || ''} onChange={e => setForm({ ...form, parcelaId: e.target.value ? Number(e.target.value) : null })} disabled={modoVer}>
                   <option value="">Selecione a parcela</option>
-                  {parcelas.map(p => <option key={p.id} value={p.id}>Nº dias: {p.numeroDias}</option>)}
+                  {parcelas.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.condicaoPagamento?.condicao ?? 'Sem condição'} — parcela {p.numeroParcela} ({p.diasVencimento} dias)
+                    </option>
+                  ))}
                 </select>
               </div>
+              {!modoVer && (
+                <p style={{ gridColumn: 'span 12', fontSize: 12, color: '#8B6E63', margin: 0 }}>
+                  Ao escolher a parcela, a conta herda o desconto, a multa e o juro da condição de pagamento dela.
+                </p>
+              )}
               <div style={{ gridColumn: 'span 12', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input type="checkbox" id="ativo-cr" checked={form.ativo} onChange={e => setForm({ ...form, ativo: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#C97B6B', cursor: 'pointer' }} disabled={modoVer} />
                 <label htmlFor="ativo-cr" style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}>Ativo</label>
               </div>
             </div>
+
+            {modoVer && contaVer?.situacao === 'RECEBIDA' && (
+              <div style={{ backgroundColor: '#FDF6F0', borderRadius: 10, padding: '14px 18px', marginBottom: 16, fontSize: 14, color: '#3D2B1F' }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Recebimento em {contaVer.dataRecebimento}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4 }}>
+                  <span>Valor da conta</span><span>{brl(contaVer.valor)}</span>
+                  <span>(−) Desconto {contaVer.percentualDesconto}%</span><span>− {brl(contaVer.valorDesconto)}</span>
+                  <span>(+) Multa {contaVer.percentualMulta}%</span><span>+ {brl(contaVer.valorMulta)}</span>
+                  <span>(+) Juro {contaVer.percentualJuro}% ao mês</span><span>+ {brl(contaVer.valorJuro)}</span>
+                  <strong>Valor recebido</strong><strong style={{ color: '#C97B6B' }}>{brl(contaVer.valorRecebido)}</strong>
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
               {!modoVer && <button onClick={salvar} style={btnPrimary}>Salvar</button>}
@@ -206,6 +262,17 @@ export default function ContasReceber() {
             </div>
           </div>
         </div>
+      )}
+
+      {baixa && (
+        <BaixaContaModal
+          tipo="recebimento"
+          descricao={baixa.descricao}
+          calcular={data => contasReceberService.calcularBaixa(baixa.id, data).then(r => r.data)}
+          confirmar={data => contasReceberService.receber(baixa.id, data)}
+          onClose={() => setBaixa(null)}
+          onConcluido={() => { setBaixa(null); carregar(); }}
+        />
       )}
     </div>
   );

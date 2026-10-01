@@ -7,9 +7,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record AgendamentoRequestDTO(
-        @NotNull LocalDateTime dataHora,
+        @NotNull(message = "Data e hora são obrigatórias") LocalDateTime dataHora,
         String observacao,
-        @NotNull Long clienteId,
-        @NotNull Long funcionarioId,
-        @NotEmpty List<Long> servicoIds
+        @NotNull(message = "Cliente é obrigatório") Long clienteId,
+        @NotNull(message = "Funcionário é obrigatório") Long funcionarioId,
+        @NotEmpty(message = "Selecione pelo menos um serviço") List<Long> servicoIds
 ) {}

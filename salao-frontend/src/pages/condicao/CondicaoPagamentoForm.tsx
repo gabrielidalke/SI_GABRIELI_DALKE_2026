@@ -12,8 +12,19 @@ interface ParcelaLocal {
   _key: number;
   id?: number;
   diasVencimento: number | '';
-  percentual: number | '';
+  percentual: string;
   formaPagamentoId: number;
+}
+
+// Multa/juro/desconto/percentual ficam como texto enquanto editados: guardar já como number
+// faz o React reescrever o valor a cada tecla (o "." do decimal some assim que é digitado,
+// "2.5" vira "2" na hora), e a única forma confiável de mudar o valor passa a ser a setinha.
+interface FormLocal {
+  condicao: string;
+  multa: string;
+  juro: string;
+  desconto: string;
+  ativo: boolean;
 }
 
 let _keyCounter = 0;
@@ -35,18 +46,18 @@ const thStyle: CSSProperties = {
 };
 const tdStyle: CSSProperties = { padding: '7px 8px', fontSize: 14, verticalAlign: 'middle' };
 
-const EMPTY: CondicaoPagamentoRequest = {
+const EMPTY: FormLocal = {
   condicao: '',
-  multa: undefined,
-  juro: undefined,
-  desconto: undefined,
+  multa: '',
+  juro: '',
+  desconto: '',
   ativo: true,
 };
 
 export default function CondicaoPagamentoForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [form, setForm] = useState<CondicaoPagamentoRequest>(EMPTY);
+  const [form, setForm] = useState<FormLocal>(EMPTY);
   const [parcelas, setParcelas] = useState<ParcelaLocal[]>([]);
   const [formas, setFormas] = useState<FormaPagamento[]>([]);
   const [erro, setErro] = useState('');
@@ -57,7 +68,13 @@ export default function CondicaoPagamentoForm() {
     if (id) {
       condicaoPagamentoService.buscarPorId(Number(id)).then(r => {
         const c = r.data as any;
-        setForm({ condicao: c.condicao, multa: c.multa, juro: c.juro, desconto: c.desconto, ativo: c.ativo });
+        setForm({
+          condicao: c.condicao,
+          multa: c.multa != null ? String(c.multa) : '',
+          juro: c.juro != null ? String(c.juro) : '',
+          desconto: c.desconto != null ? String(c.desconto) : '',
+          ativo: c.ativo,
+        });
 
         if (c.parcelas && Array.isArray(c.parcelas) && c.parcelas.length > 0) {
           setParcelas(c.parcelas.map((p: any) => ({
@@ -65,7 +82,7 @@ export default function CondicaoPagamentoForm() {
             id: p.id,
             diasVencimento: p.diasVencimento ?? 0,
             formaPagamentoId: p.formaPagamento?.id ?? p.formaPagamentoId ?? 0,
-            percentual: p.percentual ?? 0,
+            percentual: p.percentual != null ? String(p.percentual) : '',
           })));
         } else {
           parcelaService.listar().then(pr => {
@@ -75,7 +92,7 @@ export default function CondicaoPagamentoForm() {
               id: pp.id,
               diasVencimento: pp.diasVencimento ?? 0,
               formaPagamentoId: pp.formaPagamento?.id ?? 0,
-              percentual: pp.percentual ?? 0,
+              percentual: pp.percentual != null ? String(pp.percentual) : '',
             })));
           });
         }
@@ -84,7 +101,7 @@ export default function CondicaoPagamentoForm() {
   }, [id]);
 
   const adicionarParcela = () => {
-    setParcelas(prev => [...prev, { _key: newKey(), diasVencimento: 0, percentual: 0, formaPagamentoId: 0 }]);
+    setParcelas(prev => [...prev, { _key: newKey(), diasVencimento: 0, percentual: '', formaPagamentoId: 0 }]);
   };
 
   const removerParcela = (key: number) => {
@@ -100,13 +117,22 @@ export default function CondicaoPagamentoForm() {
 
   const salvar = async () => {
     if (!form.condicao.trim()) { setErro('Condição de pagamento é obrigatória.'); return; }
-    for (const p of parcelas) {
-      if (Number(p.diasVencimento) < 0) { setErro('Dias deve ser maior ou igual a zero.'); return; }
+    if (parcelas.length === 0) { setErro('Adicione pelo menos uma parcela.'); return; }
+    for (const [idx, p] of parcelas.entries()) {
+      const n = idx + 1;
+      if (String(p.diasVencimento) === '' || Number(p.diasVencimento) < 0) { setErro(`Dias para vencimento da parcela ${n} deve ser zero ou mais.`); return; }
+      if (!Number(p.percentual) || Number(p.percentual) <= 0) { setErro(`Percentual da parcela ${n} deve ser maior que zero.`); return; }
+      if (!p.formaPagamentoId) { setErro(`Selecione a forma de pagamento da parcela ${n}.`); return; }
     }
+    if (!totalOk) { setErro(`A soma dos percentuais deve ser 100% (atual: ${total}%).`); return; }
     setErro('');
     try {
       const dto: CondicaoPagamentoRequest = {
-        ...form,
+        condicao: form.condicao,
+        multa: form.multa === '' ? undefined : Number(form.multa),
+        juro: form.juro === '' ? undefined : Number(form.juro),
+        desconto: form.desconto === '' ? undefined : Number(form.desconto),
+        ativo: form.ativo,
         parcelas: parcelas.map((p, idx) => ({
           ...(p.id ? { id: p.id } : {}),
           numeroParcela: idx + 1,
@@ -162,40 +188,45 @@ export default function CondicaoPagamentoForm() {
             />
           </div>
           <div style={{ gridColumn: 'span 2' }}>
-            <label style={labelStyle}>Multa %</label>
+            <label style={labelStyle}>Multa % (atraso)</label>
             <input
               type="number" min={0} max={100} step={0.01}
               style={inputStyle}
               placeholder="0,00"
-              value={form.multa ?? ''}
-              onChange={e => setForm({ ...form, multa: e.target.value === '' ? undefined : Number(e.target.value) })}
+              value={form.multa}
+              onChange={e => setForm({ ...form, multa: e.target.value })}
             />
           </div>
-          <div style={{ gridColumn: 'span 1' }}>
-            <label style={labelStyle}>Juro %</label>
+          <div style={{ gridColumn: 'span 2' }}>
+            <label style={labelStyle}>Juro % ao mês</label>
             <input
               type="number" min={0} max={100} step={0.01}
               style={inputStyle}
-              placeholder="0"
-              value={form.juro ?? ''}
-              onChange={e => setForm({ ...form, juro: e.target.value === '' ? undefined : Number(e.target.value) })}
+              placeholder="0,00"
+              value={form.juro}
+              onChange={e => setForm({ ...form, juro: e.target.value })}
             />
           </div>
-          <div style={{ gridColumn: 'span 2' }} />
+          <div style={{ gridColumn: 'span 1' }} />
         </div>
 
         {/* Linha 2 */}
         <div style={g12}>
           <div style={{ gridColumn: 'span 2' }}>
-            <label style={labelStyle}>Desconto %</label>
+            <label style={labelStyle}>Desconto % (em dia)</label>
             <input
               type="number" min={0} max={100} step={0.01}
               style={inputStyle}
               placeholder="0,00"
-              value={form.desconto ?? ''}
-              onChange={e => setForm({ ...form, desconto: e.target.value === '' ? undefined : Number(e.target.value) })}
+              value={form.desconto}
+              onChange={e => setForm({ ...form, desconto: e.target.value })}
             />
           </div>
+          <p style={{ gridColumn: 'span 10', alignSelf: 'end', fontSize: 12, color: '#8B6E63', margin: '0 0 10px' }}>
+            Aplicados na baixa de cada parcela: pagando até o vencimento ganha o <strong>desconto</strong>
+            (no À Vista o vencimento é o próprio dia, então vira desconto à vista); pagando depois, perde o desconto
+            e paga <strong>multa</strong> uma vez + <strong>juro</strong> proporcional aos dias de atraso.
+          </p>
         </div>
 
         {/* Seção Parcelas */}
@@ -262,14 +293,7 @@ export default function CondicaoPagamentoForm() {
                       style={{ ...inputStyle, width: '100%' }}
                       placeholder="Ex: 100"
                       value={p.percentual}
-                      onChange={e => {
-                        if (e.target.value === '') {
-                          updateParcela(p._key, { percentual: '' });
-                        } else {
-                          const val = parseFloat(e.target.value);
-                          updateParcela(p._key, { percentual: isNaN(val) ? 0 : val });
-                        }
-                      }}
+                      onChange={e => updateParcela(p._key, { percentual: e.target.value })}
                     />
                   </td>
                   <td style={tdStyle}>

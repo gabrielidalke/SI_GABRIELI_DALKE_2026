@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Calendar, Users, UserCheck, Scissors, Package, Tag, Truck, Ruler,
+  Calendar, Users, UserCheck, Scissors, Package, Tag, Truck, Ruler, Boxes,
   CreditCard, MapPin, ChevronDown, ChevronUp,
   ArrowDownCircle, ArrowUpCircle, FileText,
 } from 'lucide-react';
 
 const financeiroRotas = ['/formas-pagamento', '/condicoes-pagamento', '/contas-pagar', '/contas-receber'];
 const localizacaoRotas = ['/paises', '/estados', '/cidades'];
-const fiscalRotas = ['/compras', '/notas-fiscais-entrada', '/vendas', '/notas-fiscais-saida', '/notas-fiscais-servico', '/ncm-sh'];
+const fiscalRotas = ['/pedidos-compra', '/notas-entrada', '/vendas', '/notas-fiscais-saida', '/notas-fiscais-servico', '/ncm-sh', '/classificacoes-conta'];
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -32,10 +32,12 @@ export default function Sidebar() {
     { label: 'Funcionários', path: '/funcionarios', icon: <UserCheck size={16} /> },
     { label: 'Serviços',     path: '/servicos',     icon: <Scissors size={16} /> },
     { label: 'Produtos',          path: '/produtos',         icon: <Package size={16} /> },
+    { label: 'Estoque',           path: '/estoque',          icon: <Boxes size={16} /> },
     { label: 'Categorias',        path: '/categorias',       icon: <Tag size={16} /> },
     { label: 'Marcas',            path: '/marcas',           icon: <Tag size={16} /> },
     { label: 'Unidades de Medida', path: '/unidades-medida', icon: <Ruler size={16} /> },
     { label: 'Fornecedores',      path: '/fornecedores',     icon: <Truck size={16} /> },
+    { label: 'Transportadoras',   path: '/transportadoras',  icon: <Truck size={16} /> },
   ];
 
   return (
@@ -160,12 +162,13 @@ export default function Sidebar() {
         {fiscalAberto && (
           <div>
             {[
-              { label: 'Compras',                 path: '/compras' },
-              { label: 'Notas Fiscais Entrada',   path: '/notas-fiscais-entrada' },
+              { label: 'Pedidos de Compra',       path: '/pedidos-compra' },
+              { label: 'Notas de Entrada',         path: '/notas-entrada' },
               { label: 'Vendas',                   path: '/vendas' },
               { label: 'Notas Fiscais de Saída',   path: '/notas-fiscais-saida' },
               { label: 'Notas Fiscais de Serviço', path: '/notas-fiscais-servico' },
               { label: 'NCM / SH',                 path: '/ncm-sh' },
+              { label: 'Classificações de Conta',  path: '/classificacoes-conta' },
             ].map(item => (
               <button
                 key={item.path}

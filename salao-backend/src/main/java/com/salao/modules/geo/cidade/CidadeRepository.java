@@ -8,4 +8,6 @@ public interface CidadeRepository extends JpaRepository<Cidade, Long> {
     List<Cidade> findAllByOrderByNomeAsc();
     List<Cidade> findByEstadoIdOrderByNomeAsc(Long estadoId);
     boolean existsByEstadoId(Long estadoId);
+    boolean existsByNomeIgnoreCaseAndEstadoId(String nome, Long estadoId);
+    boolean existsByNomeIgnoreCaseAndEstadoIdAndIdNot(String nome, Long estadoId, Long id);
 }

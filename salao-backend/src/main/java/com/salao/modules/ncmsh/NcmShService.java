@@ -22,6 +22,8 @@ public class NcmShService {
     }
 
     public NcmShResponseDTO criar(NcmShRequestDTO dto) {
+        if (repository.existsByCodigo(dto.codigo()))
+            throw new RuntimeException("Código NCM/SH já cadastrado");
         var ncm = NcmSh.builder()
                 .codigo(dto.codigo())
                 .descricao(dto.descricao())
@@ -32,6 +34,8 @@ public class NcmShService {
 
     public NcmShResponseDTO atualizar(Long id, NcmShRequestDTO dto) {
         var ncm = buscarEntidade(id);
+        if (!ncm.getCodigo().equals(dto.codigo()) && repository.existsByCodigo(dto.codigo()))
+            throw new RuntimeException("Código NCM/SH já cadastrado");
         ncm.setCodigo(dto.codigo());
         ncm.setDescricao(dto.descricao());
         if (dto.ativo() != null) ncm.setAtivo(dto.ativo());

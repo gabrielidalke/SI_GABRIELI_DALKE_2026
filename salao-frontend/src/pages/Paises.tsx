@@ -22,7 +22,8 @@ export default function Paises() {
   };
 
   const salvar = async () => {
-    if (!form.nome.trim() || !form.sigla.trim()) { setErro('Nome e sigla são obrigatórios.'); return; }
+    if (!form.nome.trim()) { setErro('Nome do país é obrigatório.'); return; }
+    if (!form.sigla.trim()) { setErro('Sigla é obrigatória.'); return; }
     try {
       form.id ? await paisService.atualizar(form.id, form) : await paisService.salvar(form);
       setModal(false); carregar();

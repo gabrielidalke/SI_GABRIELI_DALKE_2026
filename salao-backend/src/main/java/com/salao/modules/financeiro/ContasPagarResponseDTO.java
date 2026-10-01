@@ -14,7 +14,15 @@ public record ContasPagarResponseDTO(
         Boolean ativo,
         LocalDateTime criadoEm,
         FornecedorInfo fornecedor,
-        ParcelaInfo parcela
+        ParcelaInfo parcela,
+        BigDecimal percentualDesconto,
+        BigDecimal percentualMulta,
+        BigDecimal percentualJuro,
+        BigDecimal valorComDesconto,
+        BigDecimal valorDesconto,
+        BigDecimal valorMulta,
+        BigDecimal valorJuro,
+        BigDecimal valorPago
 ) {
     public record FornecedorInfo(Long id, String fornecedor) {}
     public record ParcelaInfo(Long id, Integer diasVencimento) {}
@@ -30,7 +38,10 @@ public record ContasPagarResponseDTO(
                 c.getId(), c.getDescricao(), c.getValor(),
                 c.getDataVencimento(), c.getDataPagamento(),
                 c.getSituacao(), c.getAtivo(), c.getCriadoEm(),
-                fornecedor, parcela
+                fornecedor, parcela,
+                c.getPercentualDesconto(), c.getPercentualMulta(), c.getPercentualJuro(),
+                c.getValor().subtract(CalculoBaixa.percentual(c.getValor(), c.getPercentualDesconto())),
+                c.getValorDesconto(), c.getValorMulta(), c.getValorJuro(), c.getValorPago()
         );
     }
 }

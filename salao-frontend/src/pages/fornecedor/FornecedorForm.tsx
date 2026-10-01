@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fornecedorService } from '../../services/fornecedorService';
@@ -64,6 +64,13 @@ export default function FornecedorForm() {
   const [form, setForm] = useState<FornecedorRequest>(EMPTY);
   const [condicoes, setCondicoes] = useState<CondicaoPagamento[]>([]);
   const [erro, setErro] = useState('');
+  const topoRef = useRef<HTMLDivElement>(null);
+
+  // O formulário é longo: rola até o topo para a mensagem não ficar escondida
+  const mostrarErro = (msg: string) => {
+    setErro(msg);
+    topoRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
     condicaoPagamentoService.listar().then(r => setCondicoes(r.data));
@@ -97,10 +104,16 @@ export default function FornecedorForm() {
     }
   }, [id]);
 
-  const set = (changes: Partial<FornecedorRequest>) => setForm(prev => ({ ...prev, ...changes }));
+  // Limpa o erro ao editar qualquer campo, para uma mensagem de uma tentativa
+  // anterior não continuar na tela como se ainda valesse para o valor atual
+  const set = (changes: Partial<FornecedorRequest>) => {
+    setForm(prev => ({ ...prev, ...changes }));
+    setErro('');
+  };
 
   const salvar = async () => {
-    if (!form.fornecedor.trim()) { setErro('Nome do fornecedor é obrigatório.'); return; }
+    if (!form.fornecedor.trim()) { mostrarErro('Nome do fornecedor é obrigatório.'); return; }
+    if (!form.cep?.trim()) { mostrarErro('CEP é obrigatório.'); return; }
     setErro('');
     try {
       const dto: FornecedorRequest = { ...form };
@@ -108,12 +121,12 @@ export default function FornecedorForm() {
       else await fornecedorService.criar(dto);
       navigate('/fornecedores');
     } catch (e: any) {
-      setErro(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.');
+      mostrarErro(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.');
     }
   };
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+    <div ref={topoRef} style={{ padding: 32, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       {/* Cabeçalho */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={pageTitle}>{id ? 'Editar' : 'Novo'} Fornecedor</h2>
@@ -238,7 +251,7 @@ export default function FornecedorForm() {
             />
           </div>
           <div style={{ gridColumn: 'span 4' }}>
-            <label style={labelStyle}>CEP</label>
+            <label style={labelStyle}>CEP *</label>
             <input
               style={inputStyle}
               placeholder="00000-000"

@@ -1,19 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cidadeService } from '../services/cidadeService';
 import type { Cidade } from '../services/cidadeService';
 import { inputStyle } from '../styles/theme';
 
-// Module-level cache: loads all cities once per session
-let _cache: Cidade[] | null = null;
+// Refetched on every mount so cities created/edited since page load show up; concurrent mounts share one request
 let _loading: Promise<Cidade[]> | null = null;
 
 function getCidades(): Promise<Cidade[]> {
-  if (_cache) return Promise.resolve(_cache);
   if (!_loading) {
-    _loading = cidadeService.listar().then(r => {
-      _cache = r.data;
-      return r.data;
-    });
+    _loading = cidadeService.listar()
+      .then(r => r.data)
+      .finally(() => { _loading = null; });
   }
   return _loading;
 }
@@ -22,15 +19,25 @@ function labelFor(c: Cidade) {
   return c.estadoUf ? `${c.nome} - ${c.estadoUf}` : c.nome;
 }
 
+// Campo vazio: navega a lista inteira (ordenada, até 30). Com texto: busca por nome/UF (até 10).
+function filtrar(todas: Cidade[], query: string): Cidade[] {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return [...todas].sort((a, b) => labelFor(a).localeCompare(labelFor(b), 'pt-BR')).slice(0, 30);
+  }
+  return todas
+    .filter(c => c.nome.toLowerCase().includes(q) || (c.estadoUf && c.estadoUf.toLowerCase().startsWith(q)))
+    .slice(0, 10);
+}
+
 interface Props {
   value: number | null;
   onChange: (cidadeId: number | null) => void;
   placeholder?: string;
 }
 
-export default function CidadeAutocomplete({ value, onChange, placeholder = 'Digite para buscar cidade...' }: Props) {
+export default function CidadeAutocomplete({ value, onChange, placeholder = 'Clique para ver ou digite para buscar...' }: Props) {
   const [texto, setTexto] = useState('');
-  const [sugestoes, setSugestoes] = useState<Cidade[]>([]);
   const [aberto, setAberto] = useState(false);
   const [todas, setTodas] = useState<Cidade[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -75,38 +82,32 @@ export default function CidadeAutocomplete({ value, onChange, placeholder = 'Dig
     return () => document.removeEventListener('mousedown', handler);
   }, [value, todas]);
 
+  // Deriva das sugestões de "todas" a cada render: se a lista ainda estava carregando no
+  // momento do clique, o menu se preenche sozinho assim que ela chegar (sem precisar focar de novo)
+  const sugestoes = useMemo(
+    () => (aberto ? filtrar(todas, value ? '' : texto) : []),
+    [aberto, todas, value, texto]
+  );
+
   const onInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
     setTexto(v);
     valorAtualRef.current = null;
     onChange(null); // clear selection while typing
-
-    if (v.length >= 2) {
-      const lower = v.toLowerCase();
-      const filtradas = todas
-        .filter(c =>
-          c.nome.toLowerCase().includes(lower) ||
-          (c.estadoUf && c.estadoUf.toLowerCase().startsWith(lower))
-        )
-        .slice(0, 10);
-      setSugestoes(filtradas);
-      setAberto(true);
-    } else {
-      setSugestoes([]);
-      setAberto(false);
-    }
+    setAberto(true);
   };
 
   const selecionar = (c: Cidade) => {
     valorAtualRef.current = c.id;
     onChange(c.id);
     setTexto(labelFor(c));
-    setSugestoes([]);
     setAberto(false);
   };
 
-  const onFocus = () => {
-    if (texto.length >= 2 && sugestoes.length > 0) setAberto(true);
+  const onFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Campo já preenchido (cidade selecionada): seleciona o texto para digitar por cima em vez de filtrar por ele
+    if (value && texto) e.target.select();
+    setAberto(true);
   };
 
   return (

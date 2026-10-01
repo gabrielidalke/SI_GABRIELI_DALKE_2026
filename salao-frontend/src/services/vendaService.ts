@@ -16,6 +16,7 @@ export interface Venda {
   numeroVenda: string;
   dataVenda: string;
   cliente?: { id: number; nome: string };
+  condicaoPagamento?: { id: number; condicao: string };
   observacao?: string;
   valorTotal: number;
   status: 'RASCUNHO' | 'VALIDADA' | 'NFE_GERADA' | 'CANCELADA';
@@ -26,6 +27,7 @@ export interface VendaRequest {
   numeroVenda: string;
   dataVenda: string;
   clienteId?: number | null;
+  condicaoPagamentoId?: number | null;
   observacao?: string;
   itens: { produtoId: number; quantidade: number; precoUnitario: number }[];
 }
