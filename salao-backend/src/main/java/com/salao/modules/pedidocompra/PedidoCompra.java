@@ -1,11 +1,13 @@
 package com.salao.modules.pedidocompra;
 
 import com.salao.modules.fornecedor.Fornecedor;
+import com.salao.modules.pagamento.CondicaoPagamento;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -30,6 +32,23 @@ public class PedidoCompra {
 
     @Column(length = 500)
     private String observacoes;
+
+    // Vem do fornecedor ao escolhê-lo, mas pode ser trocada
+    @ManyToOne
+    @JoinColumn(name = "condicao_pagamento_id")
+    private CondicaoPagamento condicaoPagamento;
+
+    @Builder.Default
+    @Column(name = "valor_frete", nullable = false, precision = 12, scale = 2)
+    private BigDecimal valorFrete = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "valor_seguro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal valorSeguro = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "outras_despesas", nullable = false, precision = 12, scale = 2)
+    private BigDecimal outrasDespesas = BigDecimal.ZERO;
 
     // ABERTA, PARCIAL ou CONCLUIDA (recalculada a partir das quantidades recebidas)
     @Builder.Default

@@ -266,9 +266,17 @@ Identificado pela **chave composta (modelo, série, número, fornecedor)** — n
 | `modelo`, `serie`, `numero` | obrigatórios, inteiros maiores que zero | "Modelo do pedido é obrigatório" etc. |
 | `fornecedorId` | obrigatório, existente e ativo | "Fornecedor não encontrado." / "Fornecedor inativo." |
 | `dataPedido` | obrigatória, não pode ser futura | "Data do pedido não pode ser posterior à data atual." |
+| `condicaoPagamentoId` | opcional; na tela vem preenchida com a condição do fornecedor, mas pode ser trocada | "Condição de pagamento não encontrada." |
+| `valorFrete`, `valorSeguro`, `outrasDespesas` | ≥ 0, até 2 decimais (vazio = 0) | "Valor do frete não pode ser negativo" etc. |
+| `observacoes` | até 500 caracteres | "Observações deve ter no máximo 500 caracteres" |
 | `itens` | pelo menos 1; produto ativo e sem repetição; quantidade > 0; valor unitário ≥ 0 | "Adicione pelo menos um produto ao pedido" / "O produto X aparece mais de uma vez no pedido." |
+| item `classificacaoContaId` | obrigatória e ativa | "Classificação da conta do item é obrigatória" / "Classificação da conta inativa: X" |
+| item `descontoPercentual` | entre 0 e 100 (vazio = 0) | "Desconto deve estar entre 0 e 100%" |
 
 - Chave duplicada: **"Já existe um pedido de compra com este modelo/série/número para este fornecedor."**
+- **Valores calculados no backend**, igual à nota: valor bruto do item = quantidade × valor unitário; desconto em R$ = bruto × percentual; valor c/ desconto = bruto − desconto. No cabeçalho: **produtos bruto**, **total de desconto** (soma dos itens), **produtos líquido**, frete, seguro, outras despesas e **valor total da compra** = líquido + frete + seguro + outras.
+- Na tela o desconto pode ser digitado **em % ou em R$** (um calcula o outro); o que vai para o servidor é o percentual com 2 casas, e a tela já mostra o valor exatamente como o servidor vai gravar.
+- Pedidos gravados antes de 02/10/2026 não têm classificação nos itens: ao editar, a tela pede a classificação de cada item antes de salvar.
 - **Situação calculada** a partir da `quantidadeRecebida` de cada item: **ABERTA** (nada recebido), **PARCIAL** (algum item recebido) e **CONCLUIDA** (todos com `quantidadeRecebida ≥ quantidade`).
 - Só pode ser **alterado** enquanto nenhum item foi recebido: **"Pedido de compra já possui itens recebidos e não pode ser alterado."**
 - Só pode ser **excluído** se ABERTA e sem nota de entrada vinculada: **"Pedido de compra possui notas de entrada vinculadas e não pode ser excluído."**
@@ -308,6 +316,8 @@ Regras de negócio (`NotaEntradaService`):
   5. passa a nota para `CONFERIDA` e preenche a `dataChegada` com a data atual se estiver vazia.
   Se qualquer etapa falhar, **nada é gravado** (rollback). A entrada em estoque e as contas a pagar **só acontecem na confirmação**, nunca ao salvar.
 - **Log** (`/api/logs`): registra CRIOU, EDITOU, CONFIRMOU e EXCLUIU (para Nota de Entrada e Pedido de Compra).
+- **Gerar Parcelas (prévia)**: `GET /api/condicoes-pagamento/{id}/parcelas?valor=&data=` devolve as parcelas (número, dias, vencimento, forma de pagamento, %, valor) **sem gravar nada**. Usa o mesmo cálculo da confirmação (`GeradorParcelas`), então as contas a pagar geradas ao confirmar são exatamente as da prévia. Erros: **"O valor total deve ser maior que zero para gerar as parcelas."** / **"Informe a data de emissão para gerar as parcelas."** Na tela, se o total, a condição ou a emissão mudarem depois de gerar, aparece o aviso para gerar de novo.
+- **Tela**: fornecedor e transportadora são escolhidos num **popup de busca** (só cadastros ativos), não digitados; data de emissão e de chegada ficam na "Identificação da Nota", ao lado do fornecedor. Ao escolher um **Pedido de Compra**, a nota recebe o fornecedor, a condição de pagamento, os produtos ainda não recebidos (quantidade que falta, valor unitário, desconto e classificação do pedido) e — se o pedido ainda está ABERTO — o frete/seguro/outras despesas do pedido; tudo pode ser ajustado antes de salvar.
 - No banco: chaves primárias compostas, `CHECK` de situação/frete, e uma chave estrangeira composta que obriga o pedido a ser do mesmo fornecedor da nota.
 
 ### Venda (`/api/vendas`) — fluxo próprio (RASCUNHO → VALIDADA → NFE_GERADA)

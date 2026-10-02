@@ -16,8 +16,14 @@ export interface PedidoCompraItem {
   produtoId: number;
   produtoNome?: string;
   unidade?: string;
+  classificacaoContaId?: number | null; // pedidos antigos (antes de 02/10) não têm
+  classificacaoNome?: string | null;
   quantidade: number;
   valorUnitario: number;
+  valorBruto: number;
+  descontoPercentual: number;
+  descontoValor: number;
+  valorLiquido: number;
   quantidadeRecebida: number;
 }
 
@@ -29,6 +35,13 @@ export interface PedidoCompra {
   dataPedido: string;
   observacoes?: string | null;
   situacao: SituacaoPedido;
+  condicaoPagamento?: { id: number; condicao: string } | null;
+  valorProdutos: number; // bruto
+  valorDesconto: number;
+  valorLiquido: number;
+  valorFrete: number;
+  valorSeguro: number;
+  outrasDespesas: number;
   valorTotal: number;
   itens: PedidoCompraItem[];
 }
@@ -36,7 +49,17 @@ export interface PedidoCompra {
 export interface PedidoCompraRequest extends PedidoCompraChave {
   dataPedido: string;
   observacoes?: string;
-  itens: { produtoId: number; quantidade: number; valorUnitario: number }[];
+  condicaoPagamentoId?: number | null;
+  valorFrete: number;
+  valorSeguro: number;
+  outrasDespesas: number;
+  itens: {
+    produtoId: number;
+    classificacaoContaId: number;
+    quantidade: number;
+    valorUnitario: number;
+    descontoPercentual: number;
+  }[];
 }
 
 const caminho = (c: PedidoCompraChave) =>

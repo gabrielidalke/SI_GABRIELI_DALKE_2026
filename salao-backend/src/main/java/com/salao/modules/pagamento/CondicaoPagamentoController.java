@@ -2,9 +2,12 @@ package com.salao.modules.pagamento;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -22,6 +25,14 @@ public class CondicaoPagamentoController {
     @GetMapping("/{id}")
     public CondicaoPagamentoResponseDTO buscar(@PathVariable Long id) {
         return service.buscarPorId(id);
+    }
+
+    // Ex.: GET /api/condicoes-pagamento/1/parcelas?valor=418.00&data=2026-08-01
+    @GetMapping("/{id}/parcelas")
+    public List<ParcelaPreviaDTO> previaParcelas(@PathVariable Long id,
+                                                 @RequestParam BigDecimal valor,
+                                                 @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
+        return service.previaParcelas(id, valor, data);
     }
 
     @PostMapping

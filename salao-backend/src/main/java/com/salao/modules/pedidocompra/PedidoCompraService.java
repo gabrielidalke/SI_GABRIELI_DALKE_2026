@@ -1,9 +1,13 @@
 package com.salao.modules.pedidocompra;
 
+import com.salao.modules.classificacaoconta.ClassificacaoConta;
+import com.salao.modules.classificacaoconta.ClassificacaoContaRepository;
 import com.salao.modules.fornecedor.Fornecedor;
 import com.salao.modules.fornecedor.FornecedorRepository;
 import com.salao.modules.log.LogSistemaService;
 import com.salao.modules.notaentrada.NotaEntradaRepository;
+import com.salao.modules.pagamento.CondicaoPagamento;
+import com.salao.modules.pagamento.CondicaoPagamentoRepository;
 import com.salao.modules.produto.Produto;
 import com.salao.modules.produto.ProdutoRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,8 @@ public class PedidoCompraService {
     private final FornecedorRepository fornecedorRepository;
     private final ProdutoRepository produtoRepository;
     private final NotaEntradaRepository notaEntradaRepository;
+    private final ClassificacaoContaRepository classificacaoContaRepository;
+    private final CondicaoPagamentoRepository condicaoPagamentoRepository;
     private final LogSistemaService logService;
 
     // --- consultas ---
@@ -67,6 +73,10 @@ public class PedidoCompraService {
                 .fornecedor(fornecedor)
                 .dataPedido(dto.dataPedido())
                 .observacoes(dto.observacoes())
+                .condicaoPagamento(resolverCondicao(dto.condicaoPagamentoId()))
+                .valorFrete(valor(dto.valorFrete()))
+                .valorSeguro(valor(dto.valorSeguro()))
+                .outrasDespesas(valor(dto.outrasDespesas()))
                 .situacao("ABERTA")
                 .build());
         itemRepository.saveAll(itens);
@@ -91,6 +101,10 @@ public class PedidoCompraService {
 
         pedido.setDataPedido(dto.dataPedido());
         pedido.setObservacoes(dto.observacoes());
+        pedido.setCondicaoPagamento(resolverCondicao(dto.condicaoPagamentoId()));
+        pedido.setValorFrete(valor(dto.valorFrete()));
+        pedido.setValorSeguro(valor(dto.valorSeguro()));
+        pedido.setOutrasDespesas(valor(dto.outrasDespesas()));
         repository.save(pedido);
 
         Map<Long, PedidoCompraItem> existentes = new HashMap<>();
@@ -99,8 +113,11 @@ public class PedidoCompraService {
         for (PedidoCompraItem novo : novos) {
             var existente = existentes.remove(novo.getId().getProdutoId());
             if (existente != null) {
+                existente.setClassificacaoConta(novo.getClassificacaoConta());
                 existente.setQuantidade(novo.getQuantidade());
                 existente.setValorUnitario(novo.getValorUnitario());
+                existente.setDescontoPercentual(novo.getDescontoPercentual());
+                existente.setDescontoValor(novo.getDescontoValor());
                 paraSalvar.add(existente);
             } else {
                 paraSalvar.add(novo);
@@ -185,11 +202,21 @@ public class PedidoCompraService {
             var produto = buscarProdutoAtivo(dto.produtoId());
             if (!vistos.add(produto.getId()))
                 throw new RuntimeException("O produto " + produto.getNome() + " aparece mais de uma vez no pedido.");
+            BigDecimal quantidade = dto.quantidade().setScale(3, RoundingMode.HALF_UP);
+            BigDecimal valorUnitario = dto.valorUnitario().setScale(2, RoundingMode.HALF_UP);
+            BigDecimal percentual = dto.descontoPercentual() != null
+                    ? dto.descontoPercentual().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2);
+            BigDecimal bruto = quantidade.multiply(valorUnitario).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal descontoValor = bruto.multiply(percentual).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
             itens.add(PedidoCompraItem.builder()
                     .id(new PedidoCompraItemId(id.getNumero(), id.getSerie(), id.getModelo(), id.getFornecedorId(), produto.getId()))
                     .produto(produto)
-                    .quantidade(dto.quantidade().setScale(3, RoundingMode.HALF_UP))
-                    .valorUnitario(dto.valorUnitario().setScale(2, RoundingMode.HALF_UP))
+                    .classificacaoConta(buscarClassificacaoAtiva(dto.classificacaoContaId()))
+                    .quantidade(quantidade)
+                    .valorUnitario(valorUnitario)
+                    .descontoPercentual(percentual)
+                    .descontoValor(descontoValor)
                     .quantidadeRecebida(BigDecimal.ZERO)
                     .build());
         }
@@ -214,6 +241,24 @@ public class PedidoCompraService {
         if (!Boolean.TRUE.equals(fornecedor.getAtivo()))
             throw new RuntimeException("Fornecedor inativo.");
         return fornecedor;
+    }
+
+    private ClassificacaoConta buscarClassificacaoAtiva(Long id) {
+        var classificacao = classificacaoContaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Classificação da conta não encontrada: " + id));
+        if (!Boolean.TRUE.equals(classificacao.getAtivo()))
+            throw new RuntimeException("Classificação da conta inativa: " + classificacao.getNome());
+        return classificacao;
+    }
+
+    private CondicaoPagamento resolverCondicao(Long id) {
+        if (id == null) return null;
+        return condicaoPagamentoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Condição de pagamento não encontrada."));
+    }
+
+    private BigDecimal valor(BigDecimal v) {
+        return (v != null ? v : BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
     }
 
     private Produto buscarProdutoAtivo(Long id) {

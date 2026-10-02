@@ -28,8 +28,20 @@ export interface CondicaoPagamentoRequest {
   parcelas?: ParcelaEmCondicao[];
 }
 
+// Linha da prévia "Gerar Parcelas": é o mesmo cálculo usado ao confirmar a nota (nada é gravado)
+export interface ParcelaPrevia {
+  numero: number;
+  diasVencimento: number;
+  percentual: number;
+  formaPagamento?: string | null;
+  dataVencimento: string;
+  valor: number;
+}
+
 export const condicaoPagamentoService = {
   listar: () => axios.get<CondicaoPagamento[]>(`${API}/condicoes-pagamento`),
+  previaParcelas: (id: number, valor: number, data: string) =>
+    axios.get<ParcelaPrevia[]>(`${API}/condicoes-pagamento/${id}/parcelas`, { params: { valor, data } }),
   buscarPorId: (id: number) => axios.get<CondicaoPagamento>(`${API}/condicoes-pagamento/${id}`),
   criar: (dto: CondicaoPagamentoRequest) => axios.post<CondicaoPagamento>(`${API}/condicoes-pagamento`, dto),
   atualizar: (id: number, dto: CondicaoPagamentoRequest) => axios.put<CondicaoPagamento>(`${API}/condicoes-pagamento/${id}`, dto),

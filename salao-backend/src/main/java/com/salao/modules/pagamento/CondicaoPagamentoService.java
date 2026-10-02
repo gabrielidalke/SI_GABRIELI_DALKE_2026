@@ -22,6 +22,17 @@ public class CondicaoPagamentoService {
         return CondicaoPagamentoResponseDTO.from(buscarEntidade(id));
     }
 
+    // Prévia "Gerar Parcelas": mesmo cálculo usado ao gerar as Contas a Pagar; não grava nada
+    @Transactional(readOnly = true)
+    public List<ParcelaPreviaDTO> previaParcelas(Long id, BigDecimal valor, java.time.LocalDate dataBase) {
+        if (valor == null || valor.signum() <= 0)
+            throw new RuntimeException("O valor total deve ser maior que zero para gerar as parcelas.");
+        if (dataBase == null)
+            throw new RuntimeException("Informe a data de emissão para gerar as parcelas.");
+        return GeradorParcelas.calcular(buscarEntidade(id), valor, dataBase).stream()
+                .map(ParcelaPreviaDTO::from).toList();
+    }
+
     @Transactional
     public CondicaoPagamentoResponseDTO criar(CondicaoPagamentoRequestDTO dto) {
         if (repository.existsByCondicao(dto.condicao()))

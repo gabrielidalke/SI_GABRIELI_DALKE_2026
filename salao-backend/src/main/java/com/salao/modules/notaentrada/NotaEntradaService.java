@@ -10,6 +10,7 @@ import com.salao.modules.fornecedor.FornecedorRepository;
 import com.salao.modules.log.LogSistemaService;
 import com.salao.modules.pagamento.CondicaoPagamento;
 import com.salao.modules.pagamento.CondicaoPagamentoRepository;
+import com.salao.modules.pagamento.GeradorParcelas;
 import com.salao.modules.pagamento.Parcela;
 import com.salao.modules.pedidocompra.PedidoCompraId;
 import com.salao.modules.pedidocompra.PedidoCompraService;
@@ -350,41 +351,19 @@ public class NotaEntradaService {
 
     // ------------------------------------------------------------------ contas a pagar
 
-    // Uma conta por parcela da condição de pagamento (a última absorve o arredondamento);
-    // sem condição, uma única conta vencendo na data de emissão
+    // Uma conta por parcela da condição de pagamento; sem condição, uma única conta na data de emissão.
+    // O cálculo vem de GeradorParcelas, o mesmo usado na prévia "Gerar Parcelas" da tela.
     private void gerarContasPagar(NotaEntrada nota) {
         var id = nota.getId();
         var condicao = nota.getCondicaoPagamento();
-        List<Parcela> parcelas = condicao != null ? condicao.getParcelas() : null;
         BigDecimal desconto = condicao != null && condicao.getDesconto() != null ? condicao.getDesconto() : BigDecimal.ZERO;
         BigDecimal multa = condicao != null && condicao.getMulta() != null ? condicao.getMulta() : BigDecimal.ZERO;
         BigDecimal juro = condicao != null && condicao.getJuro() != null ? condicao.getJuro() : BigDecimal.ZERO;
         String base = "Nota " + id.getNumero() + "/" + id.getSerie() + " (mod. " + id.getModelo() + ")";
 
-        if (parcelas == null || parcelas.isEmpty()) {
-            contasPagarRepository.save(contaDaNota(nota, base, nota.getValorTotal(), nota.getDataEmissao(), null, desconto, multa, juro));
-            return;
-        }
-
-        var ordenadas = parcelas.stream()
-                .sorted(Comparator.comparing(p -> p.getNumeroParcela() != null ? p.getNumeroParcela() : 0))
-                .toList();
-        BigDecimal total = nota.getValorTotal();
-        BigDecimal acumulado = BigDecimal.ZERO;
-        int quantidade = ordenadas.size();
-
-        for (int i = 0; i < quantidade; i++) {
-            var parcela = ordenadas.get(i);
-            BigDecimal valorParcela;
-            if (i == quantidade - 1) {
-                valorParcela = total.subtract(acumulado);
-            } else {
-                valorParcela = total.multiply(parcela.getPercentual()).divide(CEM, 2, RoundingMode.HALF_UP);
-                acumulado = acumulado.add(valorParcela);
-            }
-            int dias = parcela.getDiasVencimento() != null ? parcela.getDiasVencimento() : 0;
-            contasPagarRepository.save(contaDaNota(nota, base + " - Parcela " + (i + 1) + "/" + quantidade,
-                    valorParcela, nota.getDataEmissao().plusDays(dias), parcela, desconto, multa, juro));
+        for (var p : GeradorParcelas.calcular(condicao, nota.getValorTotal(), nota.getDataEmissao())) {
+            String descricao = p.parcela() != null ? base + " - Parcela " + p.numero() + "/" + p.total() : base;
+            contasPagarRepository.save(contaDaNota(nota, descricao, p.valor(), p.dataVencimento(), p.parcela(), desconto, multa, juro));
         }
     }
 

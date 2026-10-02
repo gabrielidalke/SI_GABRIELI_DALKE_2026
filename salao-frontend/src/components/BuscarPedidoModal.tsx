@@ -31,7 +31,7 @@ export default function BuscarPedidoModal({ fornecedorId, onSelecionar, onClose 
         </h3>
         <p style={{ fontSize: 13, color: '#8B6E63', marginTop: 0, marginBottom: 20 }}>
           {fornecedorId
-            ? 'Pedidos em aberto do fornecedor desta nota.'
+            ? 'Pedidos em aberto do fornecedor desta nota. Os produtos ainda não recebidos são carregados na nota.'
             : 'Ao escolher um pedido, o fornecedor e os produtos ainda não recebidos são carregados na nota.'}
         </p>
 
@@ -40,7 +40,7 @@ export default function BuscarPedidoModal({ fornecedorId, onSelecionar, onClose 
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20 }}>
           <thead>
             <tr style={{ backgroundColor: '#FDF0E8' }}>
-              {['Modelo / Série / Número', 'Fornecedor', 'Data', 'Situação', 'Itens a receber', ''].map(h => (
+              {['Modelo / Série / Número', 'Fornecedor', 'Data', 'Situação', 'Itens a receber', 'Valor Total', ''].map(h => (
                 <th key={h} style={{ ...th, padding: '8px 12px' }}>{h}</th>
               ))}
             </tr>
@@ -55,6 +55,7 @@ export default function BuscarPedidoModal({ fornecedorId, onSelecionar, onClose 
                   <td style={td}>{dataBR(p.dataPedido)}</td>
                   <td style={td}>{p.situacao === 'PARCIAL' ? 'Parcial' : 'Aberta'}</td>
                   <td style={td}>{aReceber} de {p.itens.length}</td>
+                  <td style={{ ...td, color: '#C97B6B', fontWeight: 600 }}>R$ {(p.valorTotal || 0).toFixed(2)}</td>
                   <td style={td}>
                     <button type="button" style={{ ...btnPrimary, padding: '6px 16px', fontSize: 12 }} onClick={() => onSelecionar(p)}>
                       Selecionar

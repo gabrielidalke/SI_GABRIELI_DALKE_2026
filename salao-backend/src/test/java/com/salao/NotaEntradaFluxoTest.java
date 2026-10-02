@@ -383,6 +383,76 @@ class NotaEntradaFluxoTest {
                 .andExpect(jsonPath("$.mensagem").value(containsString("informe número, série e modelo")));
     }
 
+    // ------------------------------------------------------------------ pedido completo e parcelas
+
+    @Test
+    void pedidoCalculaDescontoTotaisEGuardaCondicaoFreteESeguro() throws Exception {
+        // Shampoo 10 x 20 (sem desconto) + Condicionador 5 x 40 com 10%; frete 30, seguro 8, outras 2
+        enviarPost("/api/pedidos-compra", pedidoCompleto(1001, fornA,
+                ",\"condicaoPagamentoId\":" + condicao3060 + ",\"valorFrete\":30,\"valorSeguro\":8,\"outrasDespesas\":2",
+                "{\"produtoId\":" + shampoo + ",\"quantidade\":10,\"valorUnitario\":20}",
+                "{\"produtoId\":" + condicionador + ",\"quantidade\":5,\"valorUnitario\":40,\"descontoPercentual\":10}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.situacao").value("ABERTA"))
+                .andExpect(jsonPath("$.condicaoPagamento.id").value((int) condicao3060))
+                .andExpect(jsonPath("$.valorProdutos").value(400.0))
+                .andExpect(jsonPath("$.valorDesconto").value(20.0))
+                .andExpect(jsonPath("$.valorLiquido").value(380.0))
+                .andExpect(jsonPath("$.valorFrete").value(30.0))
+                .andExpect(jsonPath("$.valorTotal").value(420.0))
+                .andExpect(jsonPath("$.itens[1].valorBruto").value(200.0))
+                .andExpect(jsonPath("$.itens[1].descontoValor").value(20.0))
+                .andExpect(jsonPath("$.itens[1].valorLiquido").value(180.0))
+                .andExpect(jsonPath("$.itens[1].classificacaoContaId").value((int) classMercadoria));
+
+        // volta igual ao reabrir
+        enviarGet("/api/pedidos-compra/1/1/1001/" + fornA)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valorTotal").value(420.0))
+                .andExpect(jsonPath("$.itens[0].classificacaoNome").exists());
+
+        // classificação é obrigatória nos itens do pedido
+        enviarPost("/api/pedidos-compra",
+                "{\"modelo\":1,\"serie\":1,\"numero\":1002,\"fornecedorId\":" + fornA + ",\"dataPedido\":\"" + hoje
+                        + "\",\"itens\":[{\"produtoId\":" + shampoo + ",\"quantidade\":1,\"valorUnitario\":10}]}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Classificação da conta do item é obrigatória"));
+
+        // desconto fora de 0..100 e frete negativo
+        enviarPost("/api/pedidos-compra", pedidoCompleto(1003, fornA, ",\"valorFrete\":-1",
+                "{\"produtoId\":" + shampoo + ",\"quantidade\":1,\"valorUnitario\":10,\"descontoPercentual\":150}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value(containsString("Desconto deve estar entre 0 e 100%")));
+    }
+
+    @Test
+    void previaDeParcelasUsaOMesmoCalculoDaConfirmacao() throws Exception {
+        // 30/60 (50% e 50%) sobre 418,01 -> a última parcela absorve o centavo
+        enviarGet("/api/condicoes-pagamento/" + condicao3060 + "/parcelas?valor=418.01&data=2026-08-01")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].numero").value(1))
+                .andExpect(jsonPath("$[0].diasVencimento").value(30))
+                .andExpect(jsonPath("$[0].dataVencimento").value("2026-08-31"))
+                .andExpect(jsonPath("$[0].valor").value(209.01))
+                .andExpect(jsonPath("$[0].formaPagamento").value("Boleto"))
+                .andExpect(jsonPath("$[1].dataVencimento").value("2026-09-30"))
+                .andExpect(jsonPath("$[1].valor").value(209.0));
+
+        enviarGet("/api/condicoes-pagamento/" + condicao3060 + "/parcelas?valor=0&data=2026-08-01")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("O valor total deve ser maior que zero para gerar as parcelas."));
+
+        // a nota confirmada gera exatamente as parcelas da prévia
+        enviarPost("/api/notas-entrada", nota(2001, fornA, hoje.minusDays(2),
+                ",\"condicaoPagamentoId\":" + condicao3060, item(shampoo, classMercadoria, "1", "418.01", "0")))
+                .andExpect(status().isCreated());
+        enviarPost(url(2001, fornA) + "/confirmar", "").andExpect(status().isOk());
+        List<Map<String, Object>> contas = jdbc.queryForList("select valor from contas_pagar order by data_vencimento");
+        assertThat((BigDecimal) contas.get(0).get("valor")).isEqualByComparingTo("209.01");
+        assertThat((BigDecimal) contas.get(1).get("valor")).isEqualByComparingTo("209.00");
+    }
+
     // ------------------------------------------------------------------ listagens
 
     @Test
@@ -442,9 +512,17 @@ class NotaEntradaFluxoTest {
                 + ",\"descontoPercentual\":" + desconto + "}";
     }
 
+    // Itens no formato curto {"produtoId":..,"quantidade":..,"valorUnitario":..}: a classificação é acrescentada aqui
     private String pedido(int numero, long fornecedorId, String... itens) {
+        return pedidoCompleto(numero, fornecedorId, "", itens);
+    }
+
+    private String pedidoCompleto(int numero, long fornecedorId, String extras, String... itens) {
+        String comClassificacao = java.util.Arrays.stream(itens)
+                .map(i -> i.contains("classificacaoContaId") ? i : i.replace("{", "{\"classificacaoContaId\":" + classMercadoria + ","))
+                .collect(java.util.stream.Collectors.joining(","));
         return "{\"modelo\":1,\"serie\":1,\"numero\":" + numero + ",\"fornecedorId\":" + fornecedorId
-                + ",\"dataPedido\":\"" + hoje + "\",\"itens\":[" + String.join(",", itens) + "]}";
+                + ",\"dataPedido\":\"" + hoje + "\"" + extras + ",\"itens\":[" + comClassificacao + "]}";
     }
 
     private long id(String sql) {

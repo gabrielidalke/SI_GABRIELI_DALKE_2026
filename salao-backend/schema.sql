@@ -282,6 +282,10 @@ CREATE TABLE pedidos_compra (
     fornecedor_id BIGINT       NOT NULL REFERENCES fornecedores(id),
     data_pedido   DATE         NOT NULL,
     observacoes   VARCHAR(500),
+    condicao_pagamento_id BIGINT REFERENCES condicoes_pagamento(id),   -- vem do fornecedor, pode ser trocada
+    valor_frete     DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK (valor_frete >= 0),
+    valor_seguro    DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK (valor_seguro >= 0),
+    outras_despesas DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK (outras_despesas >= 0),
     -- ABERTA: nada recebido | PARCIAL: algo recebido | CONCLUIDA: tudo recebido
     situacao      VARCHAR(10)  NOT NULL DEFAULT 'ABERTA' CHECK (situacao IN ('ABERTA', 'PARCIAL', 'CONCLUIDA')),
     criado_em     TIMESTAMP    NOT NULL DEFAULT NOW(),
@@ -295,8 +299,11 @@ CREATE TABLE pedidos_compra_itens (
     modelo              INTEGER       NOT NULL,
     fornecedor_id       BIGINT        NOT NULL,
     produto_id          BIGINT        NOT NULL REFERENCES produtos(id),
+    classificacao_conta_id BIGINT     REFERENCES classificacoes_conta(id),   -- obrigatória nos pedidos novos (a nota herda)
     quantidade          DECIMAL(10,3) NOT NULL CHECK (quantidade > 0),
     valor_unitario      DECIMAL(10,2) NOT NULL CHECK (valor_unitario >= 0),
+    desconto_percentual DECIMAL(5,2)  NOT NULL DEFAULT 0 CHECK (desconto_percentual BETWEEN 0 AND 100),
+    desconto_valor      DECIMAL(12,2) NOT NULL DEFAULT 0,
     quantidade_recebida DECIMAL(10,3) NOT NULL DEFAULT 0 CHECK (quantidade_recebida >= 0),
     PRIMARY KEY (numero, serie, modelo, fornecedor_id, produto_id),
     FOREIGN KEY (numero, serie, modelo, fornecedor_id)

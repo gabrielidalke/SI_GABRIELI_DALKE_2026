@@ -1,16 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
-import { pedidoCompraService, type PedidoCompraChave, type SituacaoPedido } from '../../services/pedidoCompraService';
+import { pedidoCompraService, type PedidoCompraChave, type PedidoCompraRequest, type SituacaoPedido } from '../../services/pedidoCompraService';
 import { mensagemDeErro } from '../../services/notaEntradaService';
 import { produtoService, type Produto } from '../../services/produtoService';
-import { inputStyle, labelStyle, card, pageTitle, pageSubtitle, th, erroBanner, btnPrimary, btnCancel } from '../../styles/theme';
+import { classificacaoContaService, type ClassificacaoConta } from '../../services/classificacaoContaService';
+import { condicaoPagamentoService, type CondicaoPagamento } from '../../services/condicaoPagamentoService';
+import type { Fornecedor } from '../../services/fornecedorService';
+import CampoBusca from '../../components/CampoBusca';
+import { BuscarFornecedorModal } from '../../components/BuscaCadastros';
+import { PainelProduto, TabelaItens, BlocoTotais } from '../../components/ItensCompra';
+import { useItensCompra } from '../../utils/useItensCompra';
+import { calcularItem, despesasVazias, hojeISO, inteiroPositivo, valorDe, type Despesas } from '../../utils/itensCompra';
+import { inputStyle, labelStyle, card, pageTitle, pageSubtitle, erroBanner, btnPrimary, btnCancel } from '../../styles/theme';
 
-const API = 'http://localhost:8080/api';
 const sel: CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 24 };
 const dicaErro: CSSProperties = { fontSize: 11, color: '#721C24', marginTop: 4, marginBottom: 0 };
+const dica: CSSProperties = { fontSize: 11, color: '#8B6E63', marginTop: 4, marginBottom: 0 };
+
+const situacaoCfg: Record<SituacaoPedido, { label: string; bg: string; color: string }> = {
+  ABERTA: { label: 'Aberta', bg: '#FFF3CD', color: '#856404' },
+  PARCIAL: { label: 'Parcialmente recebida', bg: '#D1ECF1', color: '#0C5460' },
+  CONCLUIDA: { label: 'Concluída', bg: '#D4EDDA', color: '#2D6A4F' },
+};
 
 const SectionHeader = ({ label }: { label: string }) => (
   <div style={{ borderBottom: '1px solid #E8D5CC', paddingBottom: 8, marginBottom: 20, marginTop: 28 }}>
@@ -18,20 +31,7 @@ const SectionHeader = ({ label }: { label: string }) => (
   </div>
 );
 
-const hojeISO = () => {
-  const d = new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-};
-const fmt = (v: number) => `R$ ${(v || 0).toFixed(2)}`;
-const inteiroPositivo = (t: string) => /^\d+$/.test(t.trim()) && Number(t) > 0;
-
-// Quantidade/valor ficam como texto enquanto editados (o "." do decimal não pode sumir ao digitar)
-interface ItemLocal {
-  produtoId: number;
-  quantidade: string;
-  valorUnitario: string;
-  quantidadeRecebida: number;
-}
+const textoValor = (v?: number | null) => (v ? String(v) : '');
 
 export default function PedidoCompraForm() {
   const params = useParams();
@@ -45,18 +45,23 @@ export default function PedidoCompraForm() {
   };
 
   const [chave, setChave] = useState({ modelo: '1', serie: '1', numero: '' });
-  const [fornecedorIdInput, setFornecedorIdInput] = useState('');
-  const [fornecedorNome, setFornecedorNome] = useState('');
+  const [fornecedor, setFornecedor] = useState<{ id: number; nome: string } | null>(null);
   const [chaveValidada, setChaveValidada] = useState(false);
   const [erroChave, setErroChave] = useState('');
   const [validando, setValidando] = useState(false);
+  const [buscandoFornecedor, setBuscandoFornecedor] = useState(false);
 
   const [dataPedido, setDataPedido] = useState('');
+  const [condicaoPagamentoId, setCondicaoPagamentoId] = useState<number | ''>('');
+  const [condicaoDoFornecedor, setCondicaoDoFornecedor] = useState<number | null>(null);
   const [observacoes, setObservacoes] = useState('');
-  const [itens, setItens] = useState<ItemLocal[]>([]);
-  const [novo, setNovo] = useState({ produtoId: '' as number | '', quantidade: '1', valorUnitario: '' });
-  const [erroItem, setErroItem] = useState('');
+  const [despesas, setDespesas] = useState<Despesas>(despesasVazias);
+  const [recebidos, setRecebidos] = useState<Record<number, number>>({});
+
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [classificacoes, setClassificacoes] = useState<ClassificacaoConta[]>([]);
+  const [condicoes, setCondicoes] = useState<CondicaoPagamento[]>([]);
+  const lista = useItensCompra(produtos);
 
   const [situacao, setSituacao] = useState<SituacaoPedido | null>(null);
   const [erro, setErro] = useState('');
@@ -71,8 +76,9 @@ export default function PedidoCompraForm() {
   const mostrarErro = (msg: string) => { setErro(msg); topoRef.current?.scrollIntoView({ behavior: 'smooth' }); };
 
   useEffect(() => {
-    produtoService.listar().then(r => setProdutos(r.data))
-      .catch(e => setErro(mensagemDeErro(e, 'Erro ao carregar os produtos.')));
+    Promise.all([produtoService.listar(), classificacaoContaService.listar(), condicaoPagamentoService.listar()])
+      .then(([p, c, cp]) => { setProdutos(p.data); setClassificacoes(c.data); setCondicoes(cp.data); })
+      .catch(e => setErro(mensagemDeErro(e, 'Erro ao carregar os cadastros de apoio.')));
   }, []);
 
   useEffect(() => {
@@ -81,70 +87,90 @@ export default function PedidoCompraForm() {
       const p = r.data;
       setSituacao(p.situacao);
       setChave({ modelo: String(p.modelo), serie: String(p.serie), numero: String(p.numero) });
-      setFornecedorIdInput(String(p.fornecedor.id));
-      setFornecedorNome(p.fornecedor.nome ?? '');
+      setFornecedor({ id: p.fornecedor.id, nome: p.fornecedor.nome ?? '' });
       setChaveValidada(true);
       setDataPedido(p.dataPedido);
+      setCondicaoPagamentoId(p.condicaoPagamento?.id ?? '');
       setObservacoes(p.observacoes ?? '');
-      setItens(p.itens.map(i => ({
-        produtoId: i.produtoId, quantidade: String(i.quantidade),
-        valorUnitario: String(i.valorUnitario), quantidadeRecebida: i.quantidadeRecebida,
+      setDespesas({ valorFrete: textoValor(p.valorFrete), valorSeguro: textoValor(p.valorSeguro), outrasDespesas: textoValor(p.outrasDespesas) });
+      const rec: Record<number, number> = {};
+      p.itens.forEach(i => { rec[i.produtoId] = i.quantidadeRecebida; });
+      setRecebidos(rec);
+      lista.carregar(p.itens.map(i => ({
+        produtoId: i.produtoId, classificacaoContaId: i.classificacaoContaId ?? '',
+        quantidade: String(i.quantidade), valorUnitario: String(i.valorUnitario),
+        descontoModo: 'PERCENTUAL' as const, descontoInput: textoValor(i.descontoPercentual), persistido: false,
       })));
       setCarregando(false);
     }).catch(e => { setErro(mensagemDeErro(e, 'Erro ao carregar o pedido.')); setCarregando(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.modelo, params.serie, params.numero, params.fornecedorId]);
 
-  const validarChave = async () => {
+  // ------------------------------------------------------------------ chave
+
+  const validarChave = async (forn = fornecedor) => {
     setErroChave('');
     if (!inteiroPositivo(chave.modelo)) { setErroChave('Informe o Modelo (número inteiro maior que zero).'); return; }
     if (!inteiroPositivo(chave.serie)) { setErroChave('Informe a Série (número inteiro maior que zero).'); return; }
     if (!inteiroPositivo(chave.numero)) { setErroChave('Informe o Número do pedido (número inteiro maior que zero).'); return; }
-    if (!inteiroPositivo(fornecedorIdInput)) { setErroChave('Informe o ID do Fornecedor.'); return; }
+    if (!forn) { setErroChave('Selecione o fornecedor.'); return; }
     setValidando(true);
     try {
-      const f = await axios.get<{ fornecedor: string; ativo: boolean }>(`${API}/fornecedores/${Number(fornecedorIdInput)}`);
-      if (f.data.ativo === false) { setErroChave('Fornecedor inativo. Escolha outro.'); return; }
       const existe = await pedidoCompraService.existe({
-        modelo: Number(chave.modelo), serie: Number(chave.serie),
-        numero: Number(chave.numero), fornecedorId: Number(fornecedorIdInput),
+        modelo: Number(chave.modelo), serie: Number(chave.serie), numero: Number(chave.numero), fornecedorId: forn.id,
       });
       if (existe.data.existe) { setErroChave('Já existe um pedido com este Modelo / Série / Número para este fornecedor.'); return; }
-      setFornecedorNome(f.data.fornecedor);
       setChaveValidada(true);
     } catch (e) {
-      setErroChave(mensagemDeErro(e, 'Fornecedor não encontrado.'));
+      setErroChave(mensagemDeErro(e, 'Não foi possível validar a chave.'));
     } finally {
       setValidando(false);
     }
   };
 
-  const adicionarItem = () => {
-    if (!novo.produtoId) { setErroItem('Selecione o produto.'); return; }
-    if (!novo.quantidade || Number(novo.quantidade) <= 0) { setErroItem('Quantidade deve ser maior que zero.'); return; }
-    if (novo.valorUnitario === '' || Number(novo.valorUnitario) < 0) { setErroItem('Valor unitário é obrigatório e não pode ser negativo.'); return; }
-    if (itens.some(i => i.produtoId === novo.produtoId)) { setErroItem('Este produto já está no pedido. Remova a linha antes de adicionar de novo.'); return; }
-    setItens(prev => [...prev, { produtoId: novo.produtoId as number, quantidade: novo.quantidade, valorUnitario: novo.valorUnitario, quantidadeRecebida: 0 }]);
-    setNovo({ produtoId: '', quantidade: '1', valorUnitario: '' });
-    setErroItem('');
+  const aoSelecionarFornecedor = (f: Fornecedor) => {
+    setBuscandoFornecedor(false);
+    const escolhido = { id: f.id, nome: f.fornecedor };
+    setFornecedor(escolhido);
+    setErroChave('');
+    // A condição de pagamento vem do fornecedor (a pessoa pode trocar depois)
+    if (condicaoPagamentoId === '' || condicaoPagamentoId === condicaoDoFornecedor) {
+      setCondicaoPagamentoId(f.condicaoPagamento?.id ?? '');
+      setCondicaoDoFornecedor(f.condicaoPagamento?.id ?? null);
+    }
+    // com Modelo/Série/Número já preenchidos, valida direto
+    if (inteiroPositivo(chave.modelo) && inteiroPositivo(chave.serie) && inteiroPositivo(chave.numero)) validarChave(escolhido);
   };
 
-  const produtoDe = (id: number) => produtos.find(p => p.id === id);
-  const total = itens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0), 0);
+  // ------------------------------------------------------------------ salvar
 
   const salvar = async () => {
-    if (!chaveValidada) { mostrarErro('Valide a chave do pedido (Modelo, Série, Número e Fornecedor) antes de salvar.'); return; }
+    if (!chaveValidada || !fornecedor) { mostrarErro('Valide a chave do pedido (Modelo, Série, Número e Fornecedor) antes de salvar.'); return; }
     if (!dataPedido) { mostrarErro('Data do pedido é obrigatória.'); return; }
     if (erroData) { mostrarErro(erroData); return; }
-    if (itens.length === 0) { mostrarErro('Adicione pelo menos um produto ao pedido.'); return; }
+    if (lista.itens.length === 0) { mostrarErro('Adicione pelo menos um produto ao pedido.'); return; }
+    for (const [idx, i] of lista.itens.entries()) {
+      if (!i.classificacaoContaId) {
+        mostrarErro(`Selecione a classificação da conta do item ${idx + 1} (${lista.produtoDe(i.produtoId)?.nome ?? 'produto'}).`);
+        return;
+      }
+    }
+    const dto: PedidoCompraRequest = {
+      modelo: Number(chave.modelo), serie: Number(chave.serie), numero: Number(chave.numero),
+      fornecedorId: fornecedor.id, dataPedido,
+      observacoes: observacoes.trim() || undefined,
+      condicaoPagamentoId: condicaoPagamentoId || null,
+      valorFrete: valorDe(despesas.valorFrete), valorSeguro: valorDe(despesas.valorSeguro), outrasDespesas: valorDe(despesas.outrasDespesas),
+      itens: lista.itens.map(i => ({
+        produtoId: Number(i.produtoId),
+        classificacaoContaId: Number(i.classificacaoContaId),
+        quantidade: Number(i.quantidade),
+        valorUnitario: Number(i.valorUnitario),
+        descontoPercentual: calcularItem(i).descontoPercentual,
+      })),
+    };
     setSalvando(true);
     setErro('');
-    const dto = {
-      modelo: Number(chave.modelo), serie: Number(chave.serie), numero: Number(chave.numero),
-      fornecedorId: Number(fornecedorIdInput), dataPedido,
-      observacoes: observacoes.trim() || undefined,
-      itens: itens.map(i => ({ produtoId: i.produtoId, quantidade: Number(i.quantidade), valorUnitario: Number(i.valorUnitario) })),
-    };
     try {
       if (chaveEdicao) await pedidoCompraService.atualizar(chaveEdicao, dto);
       else await pedidoCompraService.criar(dto);
@@ -157,11 +183,18 @@ export default function PedidoCompraForm() {
 
   if (carregando) return <div style={{ padding: 32 }}>Carregando...</div>;
 
+  const sc = situacaoCfg[situacao ?? 'ABERTA'];
+
   return (
     <div ref={topoRef} style={{ padding: 32, width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
-      <div style={{ marginBottom: 32 }}>
-        <h2 style={pageTitle}>{somenteLeitura ? 'Pedido de Compra' : (isNovo ? 'Novo Pedido de Compra' : 'Editar Pedido de Compra')}</h2>
-        <p style={pageSubtitle}>O pedido é identificado por Modelo + Série + Número + Fornecedor</p>
+      <div style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h2 style={pageTitle}>{somenteLeitura ? 'Pedido de Compra' : (isNovo ? 'Novo Pedido de Compra' : 'Editar Pedido de Compra')}</h2>
+          <p style={pageSubtitle}>O pedido é identificado por Modelo + Série + Número + Fornecedor</p>
+        </div>
+        <span style={{ backgroundColor: sc.bg, color: sc.color, padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700 }}>
+          {sc.label.toUpperCase()}
+        </span>
       </div>
 
       <div style={{ ...card, padding: 32 }}>
@@ -184,32 +217,42 @@ export default function PedidoCompraForm() {
             <input type="number" min={1} step={1} style={inputStyle} value={chave.serie}
               onChange={e => { setChave({ ...chave, serie: e.target.value }); setErroChave(''); }} disabled={chaveValidada} />
           </div>
-          <div style={{ gridColumn: 'span 3' }}>
+          <div style={{ gridColumn: 'span 2' }}>
             <label style={labelStyle}>Número *</label>
             <input type="number" min={1} step={1} style={inputStyle} placeholder="Ex: 1001" value={chave.numero}
               onChange={e => { setChave({ ...chave, numero: e.target.value }); setErroChave(''); }} disabled={chaveValidada} />
           </div>
-          <div style={{ gridColumn: 'span 2' }}>
-            <label style={labelStyle}>ID Fornecedor *</label>
-            <input type="number" min={1} step={1} style={inputStyle} value={fornecedorIdInput}
-              onChange={e => { setFornecedorIdInput(e.target.value); setErroChave(''); }} disabled={chaveValidada} />
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>Fornecedor *</label>
+            <CampoBusca valor={fornecedor ? `#${fornecedor.id} — ${fornecedor.nome}` : ''} placeholder="Clique para buscar o fornecedor"
+              disabled={chaveValidada} onBuscar={() => setBuscandoFornecedor(true)} />
           </div>
-          <div style={{ gridColumn: 'span 3', display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'flex-end' }}>
             {!chaveValidada && (
-              <button type="button" onClick={validarChave} disabled={validando} style={{ ...btnPrimary, padding: '10px 20px', opacity: validando ? 0.6 : 1 }}>
-                {validando ? 'Validando...' : '🔍 Validar chave'}
+              <button type="button" onClick={() => validarChave()} disabled={validando}
+                style={{ ...btnPrimary, padding: '10px 16px', width: '100%', opacity: validando ? 0.6 : 1 }}>
+                {validando ? 'Validando...' : 'Validar chave'}
               </button>
             )}
           </div>
         </div>
         {erroChave && <p style={{ ...erroBanner, marginTop: -8 }}>{erroChave}</p>}
         {chaveValidada ? (
-          <p style={{ color: '#2D6A4F', fontWeight: 600, fontSize: 14, marginTop: -8 }}>
-            ✓ Pedido {chave.numero}/{chave.serie} (modelo {chave.modelo}) — Fornecedor: {fornecedorNome || `#${fornecedorIdInput}`}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: -8, flexWrap: 'wrap' }}>
+            <span style={{ color: '#2D6A4F', fontWeight: 600, fontSize: 14 }}>
+              ✓ Pedido {chave.numero}/{chave.serie} (modelo {chave.modelo}) — Fornecedor: {fornecedor?.nome}
+            </span>
+            {isNovo && (
+              <button type="button" onClick={() => setChaveValidada(false)} disabled={lista.itens.length > 0}
+                title={lista.itens.length > 0 ? 'Remova os produtos do pedido para poder trocar a chave' : ''}
+                style={{ ...btnCancel, padding: '6px 14px', fontSize: 12, opacity: lista.itens.length > 0 ? 0.5 : 1, cursor: lista.itens.length > 0 ? 'not-allowed' : 'pointer' }}>
+                Trocar chave
+              </button>
+            )}
+          </div>
         ) : (
           <p style={{ color: '#8B6E63', fontSize: 13, fontStyle: 'italic', marginTop: -8 }}>
-            Valide a chave para liberar o restante do formulário.
+            Informe Modelo, Série e Número, escolha o fornecedor e valide a chave para liberar o restante do formulário.
           </p>
         )}
 
@@ -221,94 +264,53 @@ export default function PedidoCompraForm() {
               onChange={e => { setDataPedido(e.target.value); setErro(''); }} disabled={!formLiberado} />
             {erroData && <p style={dicaErro}>{erroData}</p>}
           </div>
+          <div style={{ gridColumn: 'span 3' }}>
+            <label style={labelStyle}>Situação</label>
+            <input style={{ ...inputStyle, backgroundColor: '#F5F0ED', color: sc.color, fontWeight: 700 }} value={sc.label} disabled />
+            {isNovo && <p style={dica}>Todo pedido novo nasce Aberto.</p>}
+          </div>
+          <div style={{ gridColumn: 'span 6' }}>
+            <label style={labelStyle}>Condição de Pagamento</label>
+            <select style={sel} value={condicaoPagamentoId} disabled={!formLiberado}
+              onChange={e => { setCondicaoPagamentoId(e.target.value ? Number(e.target.value) : ''); setErro(''); }}>
+              <option value="">Selecione</option>
+              {condicoes.filter(c => c.ativo !== false || c.id === condicaoPagamentoId)
+                .map(c => <option key={c.id} value={c.id}>{c.condicao}</option>)}
+            </select>
+            {condicaoDoFornecedor != null && condicaoPagamentoId === condicaoDoFornecedor && (
+              <p style={dica}>Preenchida a partir do cadastro do fornecedor. Pode ser alterada.</p>
+            )}
+          </div>
         </div>
 
         {!somenteLeitura && (<>
           <SectionHeader label="Adicionar Produto" />
-          <div style={g12}>
-            <div style={{ gridColumn: 'span 5' }}>
-              <label style={labelStyle}>Produto *</label>
-              <select style={sel} value={novo.produtoId} disabled={!formLiberado}
-                onChange={e => {
-                  const id = e.target.value ? Number(e.target.value) : '';
-                  const p = id === '' ? undefined : produtoDe(id);
-                  setNovo(prev => {
-                    // o valor sugerido (preço de custo) acompanha o produto; um valor digitado é respeitado
-                    const anterior = prev.produtoId === '' ? undefined : produtoDe(prev.produtoId);
-                    const sugerido = prev.valorUnitario === '' || (anterior != null && String(anterior.precoCusto ?? 0) === prev.valorUnitario);
-                    return { ...prev, produtoId: id, valorUnitario: sugerido && p ? String(p.precoCusto ?? 0) : prev.valorUnitario };
-                  });
-                  setErroItem('');
-                }}>
-                <option value="">Selecione</option>
-                {produtos.filter(p => p.ativo !== false).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-              </select>
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Quantidade *</label>
-              <input type="number" min={0.001} step={0.001} style={inputStyle} value={novo.quantidade} disabled={!formLiberado}
-                onChange={e => { setNovo({ ...novo, quantidade: e.target.value }); setErroItem(''); }} />
-            </div>
-            <div style={{ gridColumn: 'span 3' }}>
-              <label style={labelStyle}>Valor Unitário (R$) *</label>
-              <input type="number" min={0} step={0.01} style={inputStyle} value={novo.valorUnitario} disabled={!formLiberado}
-                onChange={e => { setNovo({ ...novo, valorUnitario: e.target.value }); setErroItem(''); }} />
-            </div>
-            <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'flex-end' }}>
-              <button type="button" onClick={adicionarItem} disabled={!formLiberado}
-                style={{ backgroundColor: 'transparent', border: '1px dashed #C97B6B', color: '#C97B6B', borderRadius: 6, padding: '10px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600, width: '100%' }}>
-                + Adicionar
-              </button>
-            </div>
-          </div>
-          {erroItem && <p style={{ ...erroBanner, marginTop: -8 }}>{erroItem}</p>}
+          <PainelProduto
+            item={lista.novoItem} produtos={produtos} classificacoes={classificacoes}
+            classificacaoTravada={false} desabilitado={!formLiberado} editando={lista.editingKey != null} erro={lista.erroItem}
+            onProduto={id => lista.selecionarProduto(id)} onMudar={lista.mudarNovoItem}
+            onAdicionar={lista.adicionarOuAtualizar} onCancelarEdicao={lista.cancelarEdicao}
+          />
         </>)}
 
         <SectionHeader label="Produtos do Pedido" />
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
-          <thead>
-            <tr style={{ backgroundColor: '#FDF0E8' }}>
-              {['Produto', 'Quantidade', 'Valor Unit.', 'Recebido', 'Total'].map(h => <th key={h} style={{ ...th, padding: '8px 12px' }}>{h}</th>)}
-              {formLiberado && <th style={{ ...th, padding: '8px 12px', width: 50 }} />}
-            </tr>
-          </thead>
-          <tbody>
-            {itens.map(i => (
-              <tr key={i.produtoId} style={{ borderTop: '1px solid #F0E6DC' }}>
-                <td style={{ padding: '8px 10px', fontSize: 13 }}>{produtoDe(i.produtoId)?.nome || '—'}</td>
-                <td style={{ padding: '8px 10px', fontSize: 13 }}>{i.quantidade}</td>
-                <td style={{ padding: '8px 10px', fontSize: 13 }}>{fmt(Number(i.valorUnitario))}</td>
-                <td style={{ padding: '8px 10px', fontSize: 13 }}>{i.quantidadeRecebida}</td>
-                <td style={{ padding: '8px 10px', fontSize: 14, fontWeight: 600, color: '#C97B6B' }}>{fmt((Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0))}</td>
-                {formLiberado && (
-                  <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                    <button type="button" title="Remover" onClick={() => setItens(prev => prev.filter(x => x.produtoId !== i.produtoId))}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C97B6B' }}>🗑️</button>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {itens.length === 0 && (
-              <tr><td colSpan={formLiberado ? 6 : 5} style={{ padding: 24, textAlign: 'center', color: '#8B6E63', fontSize: 13 }}>Nenhum produto adicionado</td></tr>
-            )}
-          </tbody>
-          {itens.length > 0 && (
-            <tfoot>
-              <tr style={{ borderTop: '2px solid #E8D5CC', backgroundColor: '#FDF0E8' }}>
-                <td colSpan={4} style={{ padding: '8px 10px', fontWeight: 700, fontSize: 13 }}>Total do pedido</td>
-                <td style={{ padding: '8px 10px', fontWeight: 700, fontSize: 14, color: '#C97B6B' }}>{fmt(total)}</td>
-                {formLiberado && <td />}
-              </tr>
-            </tfoot>
-          )}
-        </table>
+        <TabelaItens
+          itens={lista.itens} produtos={produtos} classificacoes={classificacoes} editavel={formLiberado}
+          vazio="Nenhum produto adicionado"
+          extras={[{ titulo: 'Recebido', render: c => recebidos[Number(c.item.produtoId)] ?? 0 }]}
+          onEditar={lista.editar} onRemover={lista.remover} onTrocarClassificacao={lista.trocarClassificacao}
+        />
 
         <SectionHeader label="Observações" />
-        <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 8 }}>
           <textarea style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} maxLength={500}
             placeholder="Observações sobre o pedido..." value={observacoes}
             onChange={e => setObservacoes(e.target.value)} disabled={!formLiberado} />
         </div>
+
+        <SectionHeader label="Totais do Pedido" />
+        <BlocoTotais itens={lista.itens} despesas={despesas} desabilitado={!formLiberado} rotuloTotal="Valor Total da Compra"
+          onMudar={changes => { setDespesas(prev => ({ ...prev, ...changes })); setErro(''); }} />
 
         <div style={{ display: 'flex', gap: 12 }}>
           {!somenteLeitura && (
@@ -319,6 +321,10 @@ export default function PedidoCompraForm() {
           <button onClick={() => navigate('/pedidos-compra')} style={btnCancel}>{somenteLeitura ? 'Fechar' : 'Cancelar'}</button>
         </div>
       </div>
+
+      {buscandoFornecedor && (
+        <BuscarFornecedorModal onSelecionar={aoSelecionarFornecedor} onClose={() => setBuscandoFornecedor(false)} />
+      )}
     </div>
   );
 }
