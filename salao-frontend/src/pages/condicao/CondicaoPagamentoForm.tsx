@@ -30,6 +30,39 @@ interface FormLocal {
 let _keyCounter = 0;
 const newKey = () => ++_keyCounter;
 
+const MAX_PARCELAS = 60;
+
+// 100% dividido igualmente com 2 casas; a última parcela fica com o que sobrar do arredondamento
+// (3 parcelas = 33,33 + 33,33 + 33,34)
+const dividirPercentual = (n: number): string[] => {
+  const base = Math.floor(10000 / n) / 100;
+  const ultima = Math.round((100 - base * (n - 1)) * 100) / 100;
+  return Array.from({ length: n }, (_, i) => String(i === n - 1 ? ultima : base));
+};
+
+// Monta n parcelas: as que já existem mantêm dias e forma; as novas seguem o mesmo intervalo de dias
+// (30, 60, 90...) e a forma de pagamento da parcela anterior. O percentual é sempre redividido.
+const gerarParcelas = (atuais: ParcelaLocal[], n: number): ParcelaLocal[] => {
+  const percentuais = dividirPercentual(n);
+  const lista: ParcelaLocal[] = [];
+  for (let i = 0; i < n; i++) {
+    const existente = atuais[i];
+    if (existente) { lista.push({ ...existente, percentual: percentuais[i] }); continue; }
+    const anterior = lista[i - 1];
+    const antesDela = lista[i - 2];
+    const diasAnterior = anterior ? Number(anterior.diasVencimento) || 0 : 0;
+    const intervalo = anterior && antesDela && diasAnterior > (Number(antesDela.diasVencimento) || 0)
+      ? diasAnterior - (Number(antesDela.diasVencimento) || 0) : 30;
+    lista.push({
+      _key: newKey(),
+      diasVencimento: anterior ? diasAnterior + intervalo : 30,
+      percentual: percentuais[i],
+      formaPagamentoId: anterior?.formaPagamentoId ?? 0,
+    });
+  }
+  return lista;
+};
+
 const sel: CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 20 };
 
@@ -59,6 +92,7 @@ export default function CondicaoPagamentoForm() {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormLocal>(EMPTY);
   const [parcelas, setParcelas] = useState<ParcelaLocal[]>([]);
+  const [numParcelas, setNumParcelas] = useState(''); // texto do campo; as linhas só mudam com um número válido
   const [formas, setFormas] = useState<FormaPagamento[]>([]);
   const [erro, setErro] = useState('');
 
@@ -77,6 +111,7 @@ export default function CondicaoPagamentoForm() {
         });
 
         if (c.parcelas && Array.isArray(c.parcelas) && c.parcelas.length > 0) {
+          setNumParcelas(String(c.parcelas.length));
           setParcelas(c.parcelas.map((p: any) => ({
             _key: newKey(),
             id: p.id,
@@ -87,6 +122,7 @@ export default function CondicaoPagamentoForm() {
         } else {
           parcelaService.listar().then(pr => {
             const filtradas = pr.data.filter((pp: any) => pp.condicaoPagamento?.id === Number(id));
+            setNumParcelas(filtradas.length ? String(filtradas.length) : '');
             setParcelas(filtradas.map((pp: any) => ({
               _key: newKey(),
               id: pp.id,
@@ -100,24 +136,34 @@ export default function CondicaoPagamentoForm() {
     }
   }, [id]);
 
-  const adicionarParcela = () => {
-    setParcelas(prev => [...prev, { _key: newKey(), diasVencimento: 0, percentual: '', formaPagamentoId: 0 }]);
-  };
-
-  const removerParcela = (key: number) => {
-    setParcelas(prev => prev.filter(x => x._key !== key));
+  const mudarNumParcelas = (texto: string) => {
+    setNumParcelas(texto);
+    setErro('');
+    const n = Number(texto);
+    if (/^\d+$/.test(texto) && n >= 1 && n <= MAX_PARCELAS) setParcelas(prev => gerarParcelas(prev, n));
   };
 
   const updateParcela = (key: number, changes: Partial<ParcelaLocal>) => {
-    setParcelas(prev => prev.map(p => p._key === key ? { ...p, ...changes } : p));
+    setParcelas(prev => {
+      const primeira = prev[0]?._key === key;
+      return prev.map(p => {
+        if (p._key === key) return { ...p, ...changes };
+        // a forma escolhida na 1ª parcela vale também para as parcelas que ainda estão sem forma
+        if (primeira && changes.formaPagamentoId && !p.formaPagamentoId) return { ...p, formaPagamentoId: changes.formaPagamentoId };
+        return p;
+      });
+    });
   };
+
+  const numParcelasInvalido = numParcelas !== '' && !(/^\d+$/.test(numParcelas) && Number(numParcelas) >= 1 && Number(numParcelas) <= MAX_PARCELAS);
 
   const total = parcelas.reduce((s, p) => s + (Number(p.percentual) || 0), 0);
   const totalOk = Math.abs(total - 100) < 0.01;
 
   const salvar = async () => {
     if (!form.condicao.trim()) { setErro('Condição de pagamento é obrigatória.'); return; }
-    if (parcelas.length === 0) { setErro('Adicione pelo menos uma parcela.'); return; }
+    if (numParcelasInvalido) { setErro(`Número de parcelas deve ser um número inteiro de 1 a ${MAX_PARCELAS}.`); return; }
+    if (parcelas.length === 0) { setErro('Informe o número de parcelas.'); return; }
     for (const [idx, p] of parcelas.entries()) {
       const n = idx + 1;
       if (String(p.diasVencimento) === '' || Number(p.diasVencimento) < 0) { setErro(`Dias para vencimento da parcela ${n} deve ser zero ou mais.`); return; }
@@ -236,17 +282,24 @@ export default function CondicaoPagamentoForm() {
           </h3>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <p style={{ margin: 0, color: '#8B6E63', fontSize: 13 }}>
-            O percentual total deve ser igual a 100%
+        <div style={{ ...g12, marginBottom: 14 }}>
+          <div style={{ gridColumn: 'span 2' }}>
+            <label style={labelStyle}>Nº de Parcelas *</label>
+            <input
+              type="number" min={1} max={MAX_PARCELAS} step={1}
+              style={{ ...inputStyle, borderColor: numParcelasInvalido ? '#E57373' : '#E8D5CC' }}
+              placeholder="Ex: 3"
+              value={numParcelas}
+              onChange={e => mudarNumParcelas(e.target.value)}
+            />
+            {numParcelasInvalido && (
+              <p style={{ fontSize: 11, color: '#721C24', margin: '4px 0 0' }}>Use um número inteiro de 1 a {MAX_PARCELAS}.</p>
+            )}
+          </div>
+          <p style={{ gridColumn: 'span 10', alignSelf: 'end', fontSize: 12, color: '#8B6E63', margin: '0 0 10px' }}>
+            As parcelas aparecem abaixo com o percentual dividido igualmente (o total precisa dar 100%) e vencimentos de 30 em 30 dias.
+            Ajuste dias, percentual e forma de cada uma se precisar; a forma escolhida na 1ª parcela é copiada para as que estão sem forma.
           </p>
-          <button
-            type="button"
-            onClick={adicionarParcela}
-            style={{ backgroundColor: '#C97B6B', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontFamily: 'Lato, sans-serif', fontSize: 13, fontWeight: 600 }}
-          >
-            + Adicionar Parcela
-          </button>
         </div>
 
         <div style={{ border: '1px solid #E8D5CC', borderRadius: 8, overflow: 'hidden', marginBottom: 32 }}>
@@ -257,14 +310,13 @@ export default function CondicaoPagamentoForm() {
                 <th style={thStyle}>Dias para Vencimento *</th>
                 <th style={{ ...thStyle, width: 130 }}>Percentual *</th>
                 <th style={thStyle}>Forma de Pagamento *</th>
-                <th style={{ ...thStyle, width: 60, textAlign: 'center' }}>Ações</th>
               </tr>
             </thead>
             <tbody>
               {parcelas.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ ...tdStyle, textAlign: 'center', color: '#8B6E63', padding: '36px 16px', fontFamily: 'Playfair Display, serif', fontSize: 15 }}>
-                    Nenhuma parcela adicionada
+                  <td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: '#8B6E63', padding: '36px 16px', fontFamily: 'Playfair Display, serif', fontSize: 15 }}>
+                    Informe o número de parcelas acima
                   </td>
                 </tr>
               )}
@@ -306,14 +358,6 @@ export default function CondicaoPagamentoForm() {
                       {formas.map(f => <option key={f.id} value={f.id}>{f.formaPagamento}</option>)}
                     </select>
                   </td>
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={() => removerParcela(p._key)}
-                      title="Remover parcela"
-                      style={{ background: 'none', border: '1px solid #F0E6DC', color: '#8B6E63', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}
-                    >🗑</button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -336,7 +380,7 @@ export default function CondicaoPagamentoForm() {
                       {total.toFixed(2)}%
                     </span>
                   </td>
-                  <td colSpan={2} style={{ ...tdStyle, color: '#8B6E63', fontSize: 12 }}>
+                  <td style={{ ...tdStyle, color: '#8B6E63', fontSize: 12 }}>
                     {totalOk ? '✓ Percentual correto' : '⚠ Deve somar 100%'}
                   </td>
                 </tr>
