@@ -95,6 +95,7 @@ export default function NotaEntradaForm() {
   const [parcelas, setParcelas] = useState<Parcelas | null>(null);
   const [gerandoParcelas, setGerandoParcelas] = useState(false);
   const [erroParcelas, setErroParcelas] = useState('');
+  const [avisoParcelas, setAvisoParcelas] = useState('');
 
   const [situacao, setSituacao] = useState<SituacaoNota | null>(null);
   const [erro, setErro] = useState('');
@@ -102,7 +103,9 @@ export default function NotaEntradaForm() {
   const [salvando, setSalvando] = useState(false);
 
   const somenteLeitura = situacao === 'CONFERIDA';
-  const formLiberado = chaveValidada && !somenteLeitura;
+  // depois de gerar as parcelas a nota fica travada; só remover um produto destrava (e descarta as parcelas)
+  const parcelasGeradas = parcelas != null && !somenteLeitura;
+  const formLiberado = chaveValidada && !somenteLeitura && !parcelasGeradas;
   const hoje = hojeISO();
 
   const mostrarErro = (msg: string) => {
@@ -270,26 +273,49 @@ export default function NotaEntradaForm() {
   const assinaturaAtual = `${form.condicaoPagamentoId || 'avista'}|${totalNota}|${form.dataEmissao}`;
   const parcelasDesatualizadas = parcelas != null && !somenteLeitura && parcelas.assinatura !== assinaturaAtual;
 
+  // Como a nota trava depois de gerar, tudo o que impediria salvar é conferido antes
+  const problemaAntesDeGerar = (): string => {
+    if (!form.dataEmissao) return 'Informe a data de emissão para gerar as parcelas.';
+    if (erroEmissao || erroChegada || erroPlaca) return erroEmissao || erroChegada || erroPlaca;
+    if (totalNota <= 0) return 'Adicione os produtos: o valor total da nota precisa ser maior que zero.';
+    if (lista.editingKey != null) return 'Termine a edição do produto (Atualizar Produto ou Cancelar) antes de gerar as parcelas.';
+    const semClassificacao = lista.itens.findIndex(i => !i.classificacaoContaId);
+    if (semClassificacao >= 0) return `Selecione a classificação da conta do item ${semClassificacao + 1} antes de gerar as parcelas.`;
+    return '';
+  };
+
+  const travarComParcelas = (linhas: ParcelaPrevia[]) => {
+    setParcelas({ linhas, assinatura: assinaturaAtual });
+    setAvisoParcelas('');
+    lista.cancelarEdicao();
+  };
+
   const gerarParcelas = async () => {
     setErroParcelas('');
-    if (!form.dataEmissao) { setErroParcelas('Informe a data de emissão para gerar as parcelas.'); return; }
-    if (totalNota <= 0) { setErroParcelas('Adicione os produtos: o valor total da nota precisa ser maior que zero.'); return; }
+    const problema = problemaAntesDeGerar();
+    if (problema) { setErroParcelas(problema); return; }
     if (form.condicaoPagamentoId === '') {
       // sem condição: uma conta só, à vista, vencendo na emissão (igual ao que o sistema faz na confirmação)
-      setParcelas({
-        linhas: [{ numero: 1, diasVencimento: 0, percentual: 100, formaPagamento: null, dataVencimento: form.dataEmissao, valor: totalNota }],
-        assinatura: assinaturaAtual,
-      });
+      travarComParcelas([{ numero: 1, diasVencimento: 0, percentual: 100, formaPagamento: null, dataVencimento: form.dataEmissao, valor: totalNota }]);
       return;
     }
     setGerandoParcelas(true);
     try {
       const r = await condicaoPagamentoService.previaParcelas(form.condicaoPagamentoId, totalNota, form.dataEmissao);
-      setParcelas({ linhas: r.data, assinatura: assinaturaAtual });
+      travarComParcelas(r.data);
     } catch (e) {
       setErroParcelas(mensagemDeErro(e, 'Erro ao gerar as parcelas.'));
     } finally {
       setGerandoParcelas(false);
+    }
+  };
+
+  // Remover um produto é a única ação liberada com as parcelas geradas: descarta as parcelas e destrava a nota
+  const removerProduto = (key: number) => {
+    lista.remover(key);
+    if (parcelasGeradas) {
+      setParcelas(null);
+      setAvisoParcelas('Um produto foi removido: as parcelas foram descartadas e a nota voltou a ser editável. Gere as parcelas de novo depois de ajustar.');
     }
   };
 
@@ -405,6 +431,13 @@ export default function NotaEntradaForm() {
             Nota conferida: a entrada já foi efetivada no estoque e as contas a pagar foram geradas. Ela não pode mais ser editada nem excluída.
           </p>
         )}
+        {parcelasGeradas && (
+          <p style={{ ...aviso, marginTop: 0 }}>
+            🔒 Parcelas geradas: os campos da nota estão bloqueados. Você já pode <strong>Salvar</strong> ou <strong>Salvar e Confirmar</strong>.
+            Para alterar algo, remova um produto da lista (🗑️): as parcelas são descartadas e a nota volta a ser editável.
+          </p>
+        )}
+        {avisoParcelas && <p style={{ ...aviso, marginTop: 0 }}>{avisoParcelas}</p>}
 
         {/* Identificação: chave + datas */}
         <SectionHeader label="Identificação da Nota" />
@@ -433,7 +466,7 @@ export default function NotaEntradaForm() {
           <div>
             <label style={labelStyle}>Data de Emissão *</label>
             <input type="date" min={(pedido && dataPedido) || undefined} max={hoje} style={inputStyle} value={form.dataEmissao}
-              onChange={e => setCampo({ dataEmissao: e.target.value })} disabled={somenteLeitura} />
+              onChange={e => setCampo({ dataEmissao: e.target.value })} disabled={somenteLeitura || parcelasGeradas} />
             {erroEmissao
               ? <p style={dicaErro}>{erroEmissao}</p>
               : pedido && dataPedido && !somenteLeitura && <p style={dica}>A partir de {dataBR(dataPedido)} (data do pedido).</p>}
@@ -441,7 +474,7 @@ export default function NotaEntradaForm() {
           <div>
             <label style={labelStyle}>Data de Chegada</label>
             <input type="date" min={form.dataEmissao || undefined} max={hoje} style={inputStyle} value={form.dataChegada}
-              onChange={e => setCampo({ dataChegada: e.target.value })} disabled={somenteLeitura} />
+              onChange={e => setCampo({ dataChegada: e.target.value })} disabled={somenteLeitura || parcelasGeradas} />
             {erroChegada
               ? <p style={dicaErro}>{erroChegada}</p>
               : !somenteLeitura && <p style={dica}>Vazia = data da confirmação.</p>}
@@ -477,7 +510,7 @@ export default function NotaEntradaForm() {
 
         {/* Pedido de compra */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {!somenteLeitura && (
+          {!somenteLeitura && !parcelasGeradas && (
             <button type="button" onClick={() => setBuscandoPedido(true)} style={{ ...btnCancel, padding: '8px 18px' }}>
               🔍 Buscar Pedido de Compra
             </button>
@@ -487,13 +520,13 @@ export default function NotaEntradaForm() {
               <span style={{ fontSize: 13, color: '#3D2B1F' }}>
                 Vinculada ao Pedido de Compra <strong>{pedido.modelo}/{pedido.serie}/{pedido.numero}</strong>
               </span>
-              {!somenteLeitura && (
+              {!somenteLeitura && !parcelasGeradas && (
                 <button type="button" onClick={removerVinculoPedido} style={{ background: 'none', border: 'none', color: '#C97B6B', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}>
                   remover vínculo
                 </button>
               )}
             </>
-          ) : !somenteLeitura && (
+          ) : !somenteLeitura && !parcelasGeradas && (
             <span style={{ fontSize: 12, color: '#8B6E63' }}>Opcional: ao escolher um pedido, o fornecedor e os produtos são preenchidos automaticamente.</span>
           )}
         </div>
@@ -551,13 +584,14 @@ export default function NotaEntradaForm() {
         {/* Lista de produtos */}
         <SectionHeader label="Produtos da Nota" />
         <TabelaItens
-          itens={lista.itens} produtos={produtos} classificacoes={classificacoes} editavel={formLiberado}
+          itens={lista.itens} produtos={produtos} classificacoes={classificacoes}
+          editavel={formLiberado} removivel={formLiberado || parcelasGeradas}
           vazio="Nenhum produto adicionado"
           extras={[
             { titulo: 'Rateio (R$)', render: c => fmt(rateioDoItem(c.liquido)), total: fmt(custoAdicional) },
             { titulo: 'Custo Final (unit.)', render: c => fmt(custoFinalDoItem(c)) },
           ]}
-          onEditar={lista.editar} onRemover={lista.remover} onTrocarClassificacao={lista.trocarClassificacao}
+          onEditar={lista.editar} onRemover={removerProduto} onTrocarClassificacao={lista.trocarClassificacao}
         />
         {lista.itens.length === 0 && formLiberado && (
           <p style={{ ...dica, marginBottom: 12 }}>A nota pode ser salva sem produtos, mas só pode ser confirmada quando tiver pelo menos um.</p>
@@ -576,11 +610,13 @@ export default function NotaEntradaForm() {
         {!somenteLeitura && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
             <button type="button" onClick={gerarParcelas} disabled={!formLiberado || gerandoParcelas}
-              style={{ ...btnPrimary, padding: '8px 20px', opacity: !formLiberado || gerandoParcelas ? 0.6 : 1 }}>
-              {gerandoParcelas ? 'Gerando...' : 'Gerar Parcelas'}
+              style={{ ...btnPrimary, padding: '8px 20px', opacity: !formLiberado || gerandoParcelas ? 0.6 : 1, cursor: formLiberado ? 'pointer' : 'not-allowed' }}>
+              {gerandoParcelas ? 'Gerando...' : parcelasGeradas ? '✓ Parcelas geradas' : 'Gerar Parcelas'}
             </button>
             <span style={{ fontSize: 12, color: '#8B6E63' }}>
-              Calcula as parcelas pela condição de pagamento, a data de emissão e o valor total. As contas a pagar são criadas com estas parcelas quando a nota é confirmada.
+              {parcelasGeradas
+                ? 'A nota está bloqueada com estas parcelas. Para alterar, remova um produto da lista.'
+                : 'Calcula as parcelas pela condição de pagamento, a data de emissão e o valor total, e bloqueia a nota. As contas a pagar são criadas com estas parcelas quando a nota é confirmada.'}
             </span>
           </div>
         )}

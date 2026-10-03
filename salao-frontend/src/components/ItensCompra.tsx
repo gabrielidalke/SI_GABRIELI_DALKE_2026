@@ -168,7 +168,8 @@ interface TabelaProps {
   itens: ItemLocal[];
   produtos: Produto[];
   classificacoes: ClassificacaoConta[];
-  editavel: boolean; // mostra Ações e deixa trocar a classificação das linhas novas
+  editavel: boolean; // lápis de editar e troca da classificação das linhas novas
+  removivel?: boolean; // lixeira (padrão: igual a editavel)
   extras?: ColunaExtra[];
   vazio: string;
   onEditar: (item: ItemLocal) => void;
@@ -180,11 +181,12 @@ const celula: CSSProperties = { padding: '8px 10px', fontSize: 13 };
 
 // Lista de produtos com totalizador no rodapé — a mesma no Pedido de Compra e na Nota de Entrada
 export function TabelaItens({
-  itens, produtos, classificacoes, editavel, extras = [], vazio, onEditar, onRemover, onTrocarClassificacao,
+  itens, produtos, classificacoes, editavel, removivel = editavel, extras = [], vazio, onEditar, onRemover, onTrocarClassificacao,
 }: TabelaProps) {
   const calculados = itens.map(calcularItem);
   const total = somar(calculados);
-  const colunas = 9 + extras.length + (editavel ? 1 : 0);
+  const comAcoes = editavel || removivel;
+  const colunas = 9 + extras.length + (comAcoes ? 1 : 0);
   const cabecalho = ['Produto', 'Classificação', 'UND', 'Qtd.', 'Valor Unit.', 'Desc. %', 'Desc. R$', 'Valor Bruto', 'Valor c/ Desc.', ...extras.map(e => e.titulo)];
 
   return (
@@ -193,7 +195,7 @@ export function TabelaItens({
         <thead>
           <tr style={{ backgroundColor: '#FDF0E8' }}>
             {cabecalho.map(h => <th key={h} style={{ ...th, padding: '8px 12px' }}>{h}</th>)}
-            {editavel && <th style={{ ...th, padding: '8px 12px', width: 70 }}>Ações</th>}
+            {comAcoes && <th style={{ ...th, padding: '8px 12px', width: 70 }}>Ações</th>}
           </tr>
         </thead>
         <tbody>
@@ -221,10 +223,14 @@ export function TabelaItens({
                 <td style={celula}>{fmt(c.bruto)}</td>
                 <td style={{ ...celula, fontSize: 14, fontWeight: 600, color: '#C97B6B' }}>{fmt(c.liquido)}</td>
                 {extras.map(e => <td key={e.titulo} style={celula}>{e.render(c)}</td>)}
-                {editavel && (
+                {comAcoes && (
                   <td style={{ ...celula, textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    <button type="button" onClick={() => onEditar(item)} title="Editar" style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 6 }}>✏️</button>
-                    <button type="button" onClick={() => onRemover(item._key)} title="Remover" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C97B6B' }}>🗑️</button>
+                    {editavel && (
+                      <button type="button" onClick={() => onEditar(item)} title="Editar" style={{ background: 'none', border: 'none', cursor: 'pointer', marginRight: 6 }}>✏️</button>
+                    )}
+                    {removivel && (
+                      <button type="button" onClick={() => onRemover(item._key)} title="Remover" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#C97B6B' }}>🗑️</button>
+                    )}
                   </td>
                 )}
               </tr>
@@ -244,7 +250,7 @@ export function TabelaItens({
               <td style={{ ...celula, fontWeight: 700 }}>{fmt(total.bruto)}</td>
               <td style={{ ...celula, fontWeight: 700, fontSize: 14, color: '#C97B6B' }}>{fmt(total.liquido)}</td>
               {extras.map(e => <td key={e.titulo} style={{ ...celula, fontWeight: 700 }}>{e.total}</td>)}
-              {editavel && <td />}
+              {comAcoes && <td />}
             </tr>
           </tfoot>
         )}
