@@ -5,7 +5,7 @@ import {
   notaEntradaService, mensagemDeErro, caminhoTelaNota,
   type NotaEntradaChave, type NotaEntradaRequest, type PedidoRef, type SituacaoNota,
 } from '../../services/notaEntradaService';
-import type { PedidoCompra } from '../../services/pedidoCompraService';
+import { pedidoCompraService, type PedidoCompra } from '../../services/pedidoCompraService';
 import { condicaoPagamentoService, type CondicaoPagamento, type ParcelaPrevia } from '../../services/condicaoPagamentoService';
 import { classificacaoContaService, type ClassificacaoConta } from '../../services/classificacaoContaService';
 import { produtoService, type Produto } from '../../services/produtoService';
@@ -73,6 +73,7 @@ export default function NotaEntradaForm() {
 
   // pedido de compra (opcional)
   const [pedido, setPedido] = useState<PedidoRef | null>(null);
+  const [dataPedido, setDataPedido] = useState(''); // a emissão da nota não pode ser anterior a ela
   const [avisoPedido, setAvisoPedido] = useState('');
 
   const [form, setForm] = useState({
@@ -136,6 +137,11 @@ export default function NotaEntradaForm() {
       setFornecedor({ id: n.fornecedor.id, nome: n.fornecedor.nome ?? '' });
       setChaveValidada(true);
       setPedido(n.pedido ?? null);
+      if (n.pedido) {
+        pedidoCompraService.buscar({ ...n.pedido, fornecedorId: n.fornecedor.id })
+          .then(p => setDataPedido(p.data.dataPedido))
+          .catch(() => { /* sem a data, o servidor ainda valida ao salvar */ });
+      }
       setForm({
         dataEmissao: n.dataEmissao, dataChegada: n.dataChegada ?? '', tipoFrete: n.tipoFrete ?? '',
         condicaoPagamentoId: n.condicaoPagamento?.id ?? '',
@@ -219,6 +225,7 @@ export default function NotaEntradaForm() {
     if (p.fornecedor.ativo === false) { setErroChave('O fornecedor deste pedido está inativo.'); return; }
 
     setPedido({ modelo: p.modelo, serie: p.serie, numero: p.numero });
+    setDataPedido(p.dataPedido);
     const doPedido = { id: p.fornecedor.id, nome: p.fornecedor.nome ?? '' };
     setFornecedor(doPedido);
     sugerirCondicao(p.condicaoPagamento?.id, 'pedido');
@@ -244,7 +251,7 @@ export default function NotaEntradaForm() {
     if (!chaveValidada && chavePreenchida()) validarChave(doPedido);
   };
 
-  const removerVinculoPedido = () => { setPedido(null); setAvisoPedido(''); };
+  const removerVinculoPedido = () => { setPedido(null); setDataPedido(''); setAvisoPedido(''); };
 
   // ------------------------------------------------------------------ totais (prévia; o servidor recalcula ao salvar)
 
@@ -288,7 +295,10 @@ export default function NotaEntradaForm() {
 
   // ------------------------------------------------------------------ validações de data/placa (ao vivo)
 
-  const erroEmissao = form.dataEmissao && form.dataEmissao > hoje ? 'Data de emissão não pode ser posterior à data atual.' : '';
+  const erroEmissao = !form.dataEmissao ? ''
+    : form.dataEmissao > hoje ? 'Data de emissão não pode ser posterior à data atual.'
+    : pedido && dataPedido && form.dataEmissao < dataPedido
+      ? `Data de emissão não pode ser anterior à data do Pedido de Compra (${dataBR(dataPedido)}).` : '';
   const erroChegada = form.dataChegada
     ? (form.dataEmissao && form.dataChegada < form.dataEmissao ? 'Data de chegada não pode ser anterior à data de emissão.'
       : form.dataChegada > hoje ? 'Data de chegada não pode ser posterior à data atual.' : '')
@@ -422,9 +432,11 @@ export default function NotaEntradaForm() {
           </div>
           <div>
             <label style={labelStyle}>Data de Emissão *</label>
-            <input type="date" max={hoje} style={inputStyle} value={form.dataEmissao}
+            <input type="date" min={(pedido && dataPedido) || undefined} max={hoje} style={inputStyle} value={form.dataEmissao}
               onChange={e => setCampo({ dataEmissao: e.target.value })} disabled={somenteLeitura} />
-            {erroEmissao && <p style={dicaErro}>{erroEmissao}</p>}
+            {erroEmissao
+              ? <p style={dicaErro}>{erroEmissao}</p>
+              : pedido && dataPedido && !somenteLeitura && <p style={dica}>A partir de {dataBR(dataPedido)} (data do pedido).</p>}
           </div>
           <div>
             <label style={labelStyle}>Data de Chegada</label>

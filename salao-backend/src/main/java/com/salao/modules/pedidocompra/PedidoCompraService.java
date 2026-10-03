@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,6 +27,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class PedidoCompraService {
+
+    private static final DateTimeFormatter DATA_BR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final PedidoCompraRepository repository;
     private final PedidoCompraItemRepository itemRepository;
@@ -97,6 +100,12 @@ public class PedidoCompraService {
         if (antigos.stream().anyMatch(i -> i.getQuantidadeRecebida().signum() > 0))
             throw new RuntimeException("Pedido de compra já possui itens recebidos e não pode ser alterado.");
         validarData(dto.dataPedido());
+        // o pedido vem antes da nota: não pode passar a ter data depois da emissão de uma nota já vinculada
+        LocalDate primeiraEmissao = notaEntradaRepository.menorEmissaoPorPedido(
+                id.getNumero(), id.getSerie(), id.getModelo(), id.getFornecedorId());
+        if (primeiraEmissao != null && dto.dataPedido().isAfter(primeiraEmissao))
+            throw new RuntimeException("Data do pedido não pode ser posterior à emissão da nota de entrada vinculada ("
+                    + primeiraEmissao.format(DATA_BR) + ").");
         var novos = montarItens(id, dto.itens());
 
         pedido.setDataPedido(dto.dataPedido());
@@ -147,9 +156,9 @@ public class PedidoCompraService {
 
     // O fornecedor faz parte da chave do pedido, então "mesmo fornecedor da nota" é garantido pela busca
     @Transactional
-    public void exigirPedido(PedidoCompraId id) {
-        if (!repository.existsById(id))
-            throw new RuntimeException("Pedido de Compra " + descricao(id) + " não encontrado para este fornecedor.");
+    public PedidoCompra exigirPedido(PedidoCompraId id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Pedido de Compra " + descricao(id) + " não encontrado para este fornecedor."));
     }
 
     // quantidadeRecebida = quantidadeRecebida + quantidade da nota; depois recalcula a situação do pedido

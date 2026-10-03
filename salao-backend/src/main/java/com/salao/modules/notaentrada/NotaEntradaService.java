@@ -12,6 +12,7 @@ import com.salao.modules.pagamento.CondicaoPagamento;
 import com.salao.modules.pagamento.CondicaoPagamentoRepository;
 import com.salao.modules.pagamento.GeradorParcelas;
 import com.salao.modules.pagamento.Parcela;
+import com.salao.modules.pedidocompra.PedidoCompra;
 import com.salao.modules.pedidocompra.PedidoCompraId;
 import com.salao.modules.pedidocompra.PedidoCompraService;
 import com.salao.modules.produto.Produto;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -39,6 +41,7 @@ import java.util.function.Function;
 public class NotaEntradaService {
 
     private static final BigDecimal CEM = BigDecimal.valueOf(100);
+    private static final DateTimeFormatter DATA_BR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final NotaEntradaRepository repository;
     private final NotaEntradaItemRepository itemRepository;
@@ -79,7 +82,7 @@ public class NotaEntradaService {
             throw new RuntimeException("Já existe uma nota de entrada com este modelo/série/número para este fornecedor.");
         validarCabecalho(dto);
         var pedidoId = pedidoDe(dto);
-        if (pedidoId != null) pedidoCompraService.exigirPedido(pedidoId);
+        if (pedidoId != null) exigirEmissaoAposPedido(dto, pedidoCompraService.exigirPedido(pedidoId));
 
         var itens = montarItens(id, dto.itens(), Map.of());
 
@@ -108,7 +111,7 @@ public class NotaEntradaService {
         exigirPendente(nota, "editadas");
         validarCabecalho(dto);
         var pedidoNovo = pedidoDe(dto);
-        if (pedidoNovo != null) pedidoCompraService.exigirPedido(pedidoNovo);
+        if (pedidoNovo != null) exigirEmissaoAposPedido(dto, pedidoCompraService.exigirPedido(pedidoNovo));
 
         var itensAntigos = itensDe(id);
         Map<Long, Long> classificacoesAntigas = new HashMap<>();
@@ -207,6 +210,13 @@ public class NotaEntradaService {
             if (dto.dataChegada().isAfter(hoje))
                 throw new RuntimeException("Data de chegada não pode ser posterior à data atual.");
         }
+    }
+
+    // A nota do fornecedor só existe depois do pedido: emissão no mesmo dia do pedido é permitida
+    private void exigirEmissaoAposPedido(NotaEntradaRequestDTO dto, PedidoCompra pedido) {
+        if (dto.dataEmissao().isBefore(pedido.getDataPedido()))
+            throw new RuntimeException("Data de emissão não pode ser anterior à data do Pedido de Compra ("
+                    + pedido.getDataPedido().format(DATA_BR) + ").");
     }
 
     private void preencherCabecalho(NotaEntrada nota, NotaEntradaRequestDTO dto) {

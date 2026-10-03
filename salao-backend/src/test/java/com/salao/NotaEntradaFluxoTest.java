@@ -383,6 +383,43 @@ class NotaEntradaFluxoTest {
                 .andExpect(jsonPath("$.mensagem").value(containsString("informe número, série e modelo")));
     }
 
+    @Test
+    void emissaoDaNotaNaoPodeSerAnteriorAoPedido() throws Exception {
+        // pedido feito há 3 dias
+        enviarPost("/api/pedidos-compra", pedido(1001, fornA,
+                "{\"produtoId\":" + shampoo + ",\"quantidade\":10,\"valorUnitario\":20}")
+                .replace(hoje.toString(), hoje.minusDays(3).toString()))
+                .andExpect(status().isCreated());
+        String pedidoLink = ",\"pedidoNumero\":1001,\"pedidoSerie\":1,\"pedidoModelo\":1";
+        String dataPedidoBR = hoje.minusDays(3).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+
+        // nota emitida antes do pedido: bloqueia (criar)
+        enviarPost("/api/notas-entrada", nota(2001, fornA, hoje.minusDays(4), pedidoLink,
+                item(shampoo, classMercadoria, "1", "20", "0")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value(
+                        "Data de emissão não pode ser anterior à data do Pedido de Compra (" + dataPedidoBR + ")."));
+        assertThat(count("notas_entrada")).isZero();
+
+        // no mesmo dia do pedido é permitido (sem produtos, para o pedido continuar editável)
+        enviarPost("/api/notas-entrada", nota(2001, fornA, hoje.minusDays(3), pedidoLink)).andExpect(status().isCreated());
+
+        // editar a nota para antes do pedido também bloqueia
+        enviarPut(url(2001, fornA), nota(2001, fornA, hoje.minusDays(5), pedidoLink))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value(containsString("anterior à data do Pedido de Compra")));
+
+        // e o pedido não pode passar a ter data depois da emissão da nota vinculada
+        enviarPut("/api/pedidos-compra/1/1/1001/" + fornA, pedido(1001, fornA,
+                "{\"produtoId\":" + shampoo + ",\"quantidade\":10,\"valorUnitario\":20}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value(containsString("posterior à emissão da nota de entrada vinculada")));
+
+        // sem pedido vinculado, a regra não se aplica
+        enviarPost("/api/notas-entrada", nota(2002, fornA, hoje.minusDays(10), "",
+                item(shampoo, classMercadoria, "1", "20", "0"))).andExpect(status().isCreated());
+    }
+
     // ------------------------------------------------------------------ pedido completo e parcelas
 
     @Test
@@ -460,7 +497,7 @@ class NotaEntradaFluxoTest {
         // deixa dados em todas as tabelas envolvidas: pedido, nota conferida, estoque, contas a pagar, log
         enviarPost("/api/pedidos-compra", pedido(1001, fornA,
                 "{\"produtoId\":" + shampoo + ",\"quantidade\":10,\"valorUnitario\":20}")).andExpect(status().isCreated());
-        enviarPost("/api/notas-entrada", nota(2001, fornA, hoje.minusDays(1),
+        enviarPost("/api/notas-entrada", nota(2001, fornA, hoje,
                 ",\"condicaoPagamentoId\":" + condicao3060 + ",\"pedidoNumero\":1001,\"pedidoSerie\":1,\"pedidoModelo\":1",
                 item(shampoo, classMercadoria, "10", "20", "0"))).andExpect(status().isCreated());
         enviarPost(url(2001, fornA) + "/confirmar", "").andExpect(status().isOk());

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,15 @@ public interface NotaEntradaRepository extends JpaRepository<NotaEntrada, NotaEn
             """)
     boolean existePorPedido(@Param("numero") Integer numero, @Param("serie") Integer serie,
                             @Param("modelo") Integer modelo, @Param("fornecedorId") Long fornecedorId);
+
+    // Emissão mais antiga entre as notas ligadas ao pedido (null se não houver nenhuma)
+    @Query("""
+            select min(n.dataEmissao) from NotaEntrada n
+            where n.pedidoNumero = :numero and n.pedidoSerie = :serie
+              and n.pedidoModelo = :modelo and n.id.fornecedorId = :fornecedorId
+            """)
+    LocalDate menorEmissaoPorPedido(@Param("numero") Integer numero, @Param("serie") Integer serie,
+                                    @Param("modelo") Integer modelo, @Param("fornecedorId") Long fornecedorId);
 
     boolean existsByTransportadoraId(Long transportadoraId);
 }

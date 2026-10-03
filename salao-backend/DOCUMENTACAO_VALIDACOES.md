@@ -279,6 +279,7 @@ Identificado pela **chave composta (modelo, série, número, fornecedor)** — n
 - Pedidos gravados antes de 02/10/2026 não têm classificação nos itens: ao editar, a tela pede a classificação de cada item antes de salvar.
 - **Situação calculada** a partir da `quantidadeRecebida` de cada item: **ABERTA** (nada recebido), **PARCIAL** (algum item recebido) e **CONCLUIDA** (todos com `quantidadeRecebida ≥ quantidade`).
 - Só pode ser **alterado** enquanto nenhum item foi recebido: **"Pedido de compra já possui itens recebidos e não pode ser alterado."**
+- A data do pedido não pode passar a ser depois da emissão de uma nota já vinculada: **"Data do pedido não pode ser posterior à emissão da nota de entrada vinculada (dd/mm/aaaa)."**
 - Só pode ser **excluído** se ABERTA e sem nota de entrada vinculada: **"Pedido de compra possui notas de entrada vinculadas e não pode ser excluído."**
 
 ### Nota de Entrada (`/api/notas-entrada`)
@@ -295,6 +296,7 @@ Identificada pela **chave composta (modelo, série, número, fornecedor)** — *
 | `placaVeiculo` | formato `ABC-1234` ou `ABC1D23` (gravada em maiúsculas) | "Placa inválida (use ABC-1234 ou ABC1D23)" |
 | `condicaoPagamentoId`, `transportadoraId` | quando informados, existentes (transportadora também ativa) | "Condição de pagamento não encontrada." / "Transportadora inativa." |
 | `pedidoNumero`, `pedidoSerie`, `pedidoModelo` | os três juntos ou nenhum; o pedido precisa ser **do mesmo fornecedor** da nota | "Para vincular um Pedido de Compra informe número, série e modelo do pedido." / "Pedido de Compra … não encontrado para este fornecedor." |
+| `dataEmissao` com pedido vinculado | não pode ser anterior à data do pedido (no mesmo dia é permitido); na tela, o calendário já começa na data do pedido | "Data de emissão não pode ser anterior à data do Pedido de Compra (dd/mm/aaaa)." |
 | `situacao` | **não vem do cliente**: toda nota nova nasce `PENDENTE` | — |
 
 Itens (`NotaEntradaItemRequestDTO`): `produtoId` (ativo) e `classificacaoContaId` (ativa) obrigatórios; `quantidade` > 0 (até 7 inteiros e 3 decimais); `valorUnitario` ≥ 0; `descontoPercentual` entre 0 e 100. **O mesmo produto não pode aparecer duas vezes**: **"O produto X aparece mais de uma vez nesta nota."**
