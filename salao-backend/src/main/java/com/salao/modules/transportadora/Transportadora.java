@@ -26,7 +26,7 @@ public class Transportadora {
     @Column(name = "cpf_cnpj", length = 18)
     private String cpfCnpj;
 
-    @Column(length = 20)
+    @Column(length = 15)
     private String fone;
 
     @Column(length = 200)
@@ -35,7 +35,7 @@ public class Transportadora {
     @Column(length = 100)
     private String bairro;
 
-    @Column(length = 20)
+    @Column(length = 9)
     private String cep;
 
     @Builder.Default

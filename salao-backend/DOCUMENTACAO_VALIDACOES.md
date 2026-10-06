@@ -363,3 +363,30 @@ Regras de negócio (`VendaService`):
 - **Duplicidade geralmente checada só na criação** (Produto, Cliente/CPF, Categoria é exceção e checa em ambos) — editar um registro para um valor já usado por outro nem sempre é bloqueado pela aplicação.
 - **Nota de Entrada e Pedido de Compra não têm numeração automática**: são identificados pela chave composta (modelo, série, número, fornecedor) informada pelo usuário. Já as notas de saída e de serviço seguem numeração automática (`NFS-`, `NFSE-`).
 - **Geração de Contas a Pagar/Receber e movimentação de Estoque é 100% automática**, disparada pela geração da NF-e — não existe caminho manual paralelo para isso além de criar uma Conta a Pagar/Receber avulsa (`POST /api/contas-pagar` / `/api/contas-receber`), que não passa pelo estoque.
+
+
+---
+
+## Atualização 06/10/2026 — Contas a Pagar na Nota de Entrada e novas validações
+
+**Contas a Pagar dentro da Nota.** A resposta de `GET /api/notas-entrada/{modelo}/{serie}/{numero}/{fornecedorId}` traz a lista `contasPagar` (vazia enquanto a nota está PENDENTE; com uma conta por parcela depois de CONFERIDA). A tela da nota conferida mostra essa lista com situação, vencimento, valor pago e botões Pagar/Cancelar. Cada conta devolve `nota` (modelo/série/número) para a tela de Contas a Pagar mostrar a origem.
+
+**Conta a Pagar (`/api/contas-pagar`)**
+- `descricao` até 200 caracteres; `valor` maior que zero, até 10 inteiros e 2 decimais; vencimento entre 2000 e hoje + 10 anos (**"Data de vencimento inválida..."**); data de pagamento não pode ser futura nem anterior a 2000.
+- Fornecedor precisa existir e estar ativo (**"Fornecedor inativo."**).
+- Conta gerada por uma nota só pode ser **paga ou cancelada**: editar → **"Esta conta foi gerada pela Nota de Entrada ... e não pode ser editada"**; excluir → **"Contas geradas por uma Nota de Entrada não podem ser excluídas"** (ficam canceladas como histórico).
+
+**Nota de Entrada (`/api/notas-entrada`)**
+- Limites da chave: modelo até 2 dígitos, série até 3, número até 9; pedido (se informado) com valores positivos; no máximo 200 produtos.
+- Data de emissão não pode ser anterior a 2000.
+- Valor de frete maior que zero exige tipo de frete CIF/FOB: **"Informe o tipo de frete (CIF ou FOB) quando houver valor de frete."**
+- Quantidade do item deve ser **inteira** (o saldo do estoque é inteiro; antes, 2,5 era arredondado e o estoque "perdia" produto): **"Produto X: a quantidade deve ser um número inteiro..."**
+- Condição de pagamento inativa é recusada: **"Condição de pagamento inativa."**
+- Valor do item ou da nota acima de R$ 9.999.999.999,99 → **"...é grande demais"** (antes estourava o banco).
+
+**Fornecedor e Transportadora**
+- Nome de 3 a 150 caracteres (espaços das pontas são cortados); endereço até 200, bairro até 100, inscrição estadual até 20 (letras, números, `.`, `-`, `/`), telefone até 15, CEP no formato `00000-000`; textos em branco viram nulo.
+- CPF/CNPJ só com números e pontuação, validado pelo dígito verificador e **gravado formatado** (`000.000.000-00` / `00.000.000/0000-00`); duplicidade barrada mesmo se um vier com máscara e o outro sem: **"Já existe um fornecedor/uma transportadora cadastrada com este CPF/CNPJ."**
+- Fornecedor com notas de entrada ou pedidos de compra não pode ser excluído (antes dava erro de chave estrangeira).
+
+**Tipos no banco (ver `atualizacao_2026-10-06_contas_pagar_nota.sql`)**: `contas_pagar.valor` e derivados passaram de `DECIMAL(10,2)` para `DECIMAL(12,2)` (igual ao total da nota); `situacao` e a chave da nota ganharam `CHECK`; `cep` → `VARCHAR(9)`, `fone` → `VARCHAR(15)`, `inscricao_estadual` → `VARCHAR(20)`; índice para listar as contas de uma nota.

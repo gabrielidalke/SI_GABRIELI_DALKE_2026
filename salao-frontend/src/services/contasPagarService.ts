@@ -35,6 +35,8 @@ export interface ContaPagar {
   valorMulta: number;
   valorJuro: number;
   valorPago?: number;
+  // Nota de Entrada que gerou a conta (null quando foi lançada manualmente)
+  nota?: { modelo: number; serie: number; numero: number } | null;
 }
 
 export interface ContaPagarRequest {

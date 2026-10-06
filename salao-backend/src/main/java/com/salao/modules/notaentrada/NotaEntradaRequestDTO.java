@@ -2,6 +2,7 @@ package com.salao.modules.notaentrada;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -16,11 +17,14 @@ import java.util.List;
 // Os valores totais também são sempre recalculados no backend.
 public record NotaEntradaRequestDTO(
         @NotNull(message = "Modelo é obrigatório")
-        @Positive(message = "Modelo deve ser maior que zero") Integer modelo,
+        @Positive(message = "Modelo deve ser maior que zero")
+        @Max(value = 99, message = "Modelo deve ter no máximo 2 dígitos") Integer modelo,
         @NotNull(message = "Série é obrigatória")
-        @Positive(message = "Série deve ser maior que zero") Integer serie,
+        @Positive(message = "Série deve ser maior que zero")
+        @Max(value = 999, message = "Série deve ter no máximo 3 dígitos") Integer serie,
         @NotNull(message = "Número é obrigatório")
-        @Positive(message = "Número deve ser maior que zero") Integer numero,
+        @Positive(message = "Número deve ser maior que zero")
+        @Max(value = 999999999, message = "Número deve ter no máximo 9 dígitos") Integer numero,
         @NotNull(message = "Fornecedor é obrigatório") Long fornecedorId,
         @NotNull(message = "Data de emissão é obrigatória") LocalDate dataEmissao,
         LocalDate dataChegada,
@@ -35,8 +39,8 @@ public record NotaEntradaRequestDTO(
         Long transportadoraId,
         @Pattern(regexp = "[A-Za-z]{3}-?\\d[A-Za-z0-9]\\d{2}", message = "Placa inválida (use ABC-1234 ou ABC1D23)") String placaVeiculo,
         @Size(max = 500, message = "Observações deve ter no máximo 500 caracteres") String observacoes,
-        Integer pedidoNumero,
-        Integer pedidoSerie,
-        Integer pedidoModelo,
-        @Valid List<NotaEntradaItemRequestDTO> itens
+        @Positive(message = "Número do pedido deve ser maior que zero") Integer pedidoNumero,
+        @Positive(message = "Série do pedido deve ser maior que zero") Integer pedidoSerie,
+        @Positive(message = "Modelo do pedido deve ser maior que zero") Integer pedidoModelo,
+        @Size(max = 200, message = "A nota pode ter no máximo 200 produtos") @Valid List<NotaEntradaItemRequestDTO> itens
 ) {}

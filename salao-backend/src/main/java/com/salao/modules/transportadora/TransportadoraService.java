@@ -27,15 +27,18 @@ public class TransportadoraService {
 
     public TransportadoraResponseDTO criar(TransportadoraRequestDTO dto) {
         validarCpfCnpj(dto.cpfCnpj());
-        if (repository.existsByNomeIgnoreCase(dto.nome()))
+        String documento = CpfCnpjValidator.formatar(dto.cpfCnpj());
+        if (repository.existsByNomeIgnoreCase(dto.nome().trim()))
             throw new RuntimeException("Transportadora já cadastrada");
+        if (documento != null && repository.existsByCpfCnpj(documento))
+            throw new RuntimeException("Já existe uma transportadora cadastrada com este CPF/CNPJ.");
 
         var transportadora = Transportadora.builder()
-                .nome(dto.nome())
-                .cpfCnpj(dto.cpfCnpj())
+                .nome(dto.nome().trim())
+                .cpfCnpj(documento)
                 .fone(dto.fone())
-                .endereco(dto.endereco())
-                .bairro(dto.bairro())
+                .endereco(vazioParaNulo(dto.endereco()))
+                .bairro(vazioParaNulo(dto.bairro()))
                 .cep(dto.cep())
                 .ativo(dto.ativo() != null ? dto.ativo() : true)
                 .cidade(resolveCidade(dto.cidadeId()))
@@ -47,14 +50,17 @@ public class TransportadoraService {
     public TransportadoraResponseDTO atualizar(Long id, TransportadoraRequestDTO dto) {
         validarCpfCnpj(dto.cpfCnpj());
         var transportadora = buscarEntidade(id);
-        if (repository.existsByNomeIgnoreCaseAndIdNot(dto.nome(), id))
+        String documento = CpfCnpjValidator.formatar(dto.cpfCnpj());
+        if (repository.existsByNomeIgnoreCaseAndIdNot(dto.nome().trim(), id))
             throw new RuntimeException("Transportadora já cadastrada");
+        if (documento != null && repository.existsByCpfCnpjAndIdNot(documento, id))
+            throw new RuntimeException("Já existe uma transportadora cadastrada com este CPF/CNPJ.");
 
-        transportadora.setNome(dto.nome());
-        transportadora.setCpfCnpj(dto.cpfCnpj());
+        transportadora.setNome(dto.nome().trim());
+        transportadora.setCpfCnpj(documento);
         transportadora.setFone(dto.fone());
-        transportadora.setEndereco(dto.endereco());
-        transportadora.setBairro(dto.bairro());
+        transportadora.setEndereco(vazioParaNulo(dto.endereco()));
+        transportadora.setBairro(vazioParaNulo(dto.bairro()));
         transportadora.setCep(dto.cep());
         if (dto.ativo() != null) transportadora.setAtivo(dto.ativo());
         transportadora.setCidade(resolveCidade(dto.cidadeId()));
@@ -67,6 +73,10 @@ public class TransportadoraService {
         if (notaEntradaRepository.existsByTransportadoraId(id))
             throw new RuntimeException("Transportadora possui notas de entrada vinculadas e não pode ser excluída");
         repository.deleteById(id);
+    }
+
+    private String vazioParaNulo(String texto) {
+        return texto == null || texto.isBlank() ? null : texto.trim();
     }
 
     private void validarCpfCnpj(String cpfCnpj) {

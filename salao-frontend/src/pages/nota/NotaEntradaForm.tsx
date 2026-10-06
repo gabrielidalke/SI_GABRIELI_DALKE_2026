@@ -11,6 +11,8 @@ import { classificacaoContaService, type ClassificacaoConta } from '../../servic
 import { produtoService, type Produto } from '../../services/produtoService';
 import type { Fornecedor } from '../../services/fornecedorService';
 import BuscarPedidoModal from '../../components/BuscarPedidoModal';
+import BaixaContaModal from '../../components/BaixaContaModal';
+import { contasPagarService, type ContaPagar } from '../../services/contasPagarService';
 import CampoBusca from '../../components/CampoBusca';
 import { BuscarFornecedorModal, BuscarTransportadoraModal } from '../../components/BuscaCadastros';
 import { PainelProduto, TabelaItens, BlocoTotais } from '../../components/ItensCompra';
@@ -32,6 +34,9 @@ const dicaErro: CSSProperties = { fontSize: 11, color: '#721C24', marginTop: 4, 
 const dica: CSSProperties = { fontSize: 11, color: '#8B6E63', marginTop: 4, marginBottom: 0 };
 const aviso: CSSProperties = { backgroundColor: '#FFF3CD', color: '#856404', padding: '10px 14px', borderRadius: 8, fontSize: 13 };
 const PLACA = /^[A-Z]{3}-?\d[A-Z0-9]\d{2}$/;
+// Num salão a compra vem direto pela Nota de Entrada: a busca de Pedido de Compra fica escondida (a tela continua
+// existindo; troque para true para voltar a oferecer o vínculo em notas novas)
+const OFERECER_PEDIDO_COMPRA = false;
 
 const SectionHeader = ({ label }: { label: string }) => (
   <div style={{ borderBottom: '1px solid #E8D5CC', paddingBottom: 8, marginBottom: 20, marginTop: 28 }}>
@@ -98,6 +103,9 @@ export default function NotaEntradaForm() {
   const [avisoParcelas, setAvisoParcelas] = useState('');
 
   const [situacao, setSituacao] = useState<SituacaoNota | null>(null);
+  // contas a pagar geradas pela confirmação (a nota conferida mostra e permite pagar)
+  const [contasNota, setContasNota] = useState<ContaPagar[]>([]);
+  const [contaEmBaixa, setContaEmBaixa] = useState<ContaPagar | null>(null);
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(!isNovo);
   const [salvando, setSalvando] = useState(false);
@@ -160,16 +168,24 @@ export default function NotaEntradaForm() {
         quantidade: String(i.quantidade), valorUnitario: String(i.valorUnitario),
         descontoModo: 'PERCENTUAL' as const, descontoInput: textoValor(i.descontoPercentual), persistido: true,
       })));
+      setContasNota(n.contasPagar ?? []);
       setCarregando(false);
-      // nota conferida: mostra direto as parcelas que viraram contas a pagar
-      if (n.situacao === 'CONFERIDA' && n.condicaoPagamento) {
-        condicaoPagamentoService.previaParcelas(n.condicaoPagamento.id, n.valorTotal, n.dataEmissao)
-          .then(p => setParcelas({ linhas: p.data, assinatura: `${n.condicaoPagamento!.id}|${n.valorTotal}|${n.dataEmissao}` }))
-          .catch(() => { /* a prévia é só informativa */ });
-      }
     }).catch(e => { setErro(mensagemDeErro(e, 'Erro ao carregar a nota de entrada.')); setCarregando(false); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.modelo, params.serie, params.numero, params.fornecedorId]);
+
+  // Depois de pagar ou cancelar uma conta: busca a nota de novo para atualizar a lista
+  const recarregarContas = async () => {
+    if (!chaveEdicao) return;
+    try { setContasNota((await notaEntradaService.buscar(chaveEdicao)).data.contasPagar ?? []); }
+    catch (e) { setErro(mensagemDeErro(e, 'Erro ao atualizar as contas a pagar.')); }
+  };
+
+  const cancelarConta = async (c: ContaPagar) => {
+    if (!confirm(`Cancelar a conta "${c.descricao}"?`)) return;
+    try { await contasPagarService.cancelar(c.id); await recarregarContas(); }
+    catch (e) { setErro(mensagemDeErro(e, 'Erro ao cancelar a conta.')); }
+  };
 
   // ------------------------------------------------------------------ chave
 
@@ -509,7 +525,7 @@ export default function NotaEntradaForm() {
         )}
 
         {/* Pedido de compra */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        {(pedido != null || OFERECER_PEDIDO_COMPRA) && <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {!somenteLeitura && !parcelasGeradas && (
             <button type="button" onClick={() => setBuscandoPedido(true)} style={{ ...btnCancel, padding: '8px 18px' }}>
               🔍 Buscar Pedido de Compra
@@ -529,7 +545,7 @@ export default function NotaEntradaForm() {
           ) : !somenteLeitura && !parcelasGeradas && (
             <span style={{ fontSize: 12, color: '#8B6E63' }}>Opcional: ao escolher um pedido, o fornecedor e os produtos são preenchidos automaticamente.</span>
           )}
-        </div>
+        </div>}
         {avisoPedido && <p style={{ ...aviso, marginBottom: 0 }}>{avisoPedido}</p>}
 
         {/* Dados da nota */}
@@ -606,7 +622,7 @@ export default function NotaEntradaForm() {
           onMudar={changes => { setDespesas(prev => ({ ...prev, ...changes })); setErro(''); }} />
 
         {/* Parcelas */}
-        <SectionHeader label={somenteLeitura ? 'Parcelas (contas a pagar geradas)' : 'Parcelas'} />
+        <SectionHeader label={somenteLeitura ? 'Contas a Pagar desta nota' : 'Parcelas'} />
         {!somenteLeitura && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
             <button type="button" onClick={gerarParcelas} disabled={!formLiberado || gerandoParcelas}
@@ -624,7 +640,7 @@ export default function NotaEntradaForm() {
         {parcelasDesatualizadas && (
           <p style={{ ...aviso, marginTop: 0 }}>Os valores da nota mudaram depois que as parcelas foram geradas. Clique em Gerar Parcelas de novo.</p>
         )}
-        {parcelas && (
+        {parcelas && !somenteLeitura && (
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12, opacity: parcelasDesatualizadas ? 0.5 : 1 }}>
             <thead>
               <tr style={{ backgroundColor: '#FDF0E8' }}>
@@ -651,7 +667,50 @@ export default function NotaEntradaForm() {
             </tfoot>
           </table>
         )}
-        {!parcelas && somenteLeitura && <p style={dica}>Sem condição de pagamento: uma conta à vista, vencendo na data de emissão.</p>}
+        {somenteLeitura && (contasNota.length === 0
+          ? <p style={dica}>Esta nota não gerou contas a pagar.</p>
+          : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
+              <thead>
+                <tr style={{ backgroundColor: '#FDF0E8' }}>
+                  {['Conta', 'Vencimento', 'Valor', 'Situação', 'Pago em', 'Valor pago', ''].map(h => <th key={h} style={{ ...th, padding: '8px 12px' }}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {contasNota.map(c => {
+                  const cor = c.situacao === 'PAGA' ? ['#D4EDDA', '#2D6A4F'] : c.situacao === 'CANCELADA' ? ['#F0E6DC', '#8B6E63'] : ['#FFF3CD', '#856404'];
+                  return (
+                    <tr key={c.id} style={{ borderTop: '1px solid #F0E6DC' }}>
+                      <td style={{ padding: '8px 12px', fontSize: 13 }}>{c.descricao}</td>
+                      <td style={{ padding: '8px 12px', fontSize: 13 }}>{dataBR(c.dataVencimento)}</td>
+                      <td style={{ padding: '8px 12px', fontSize: 14, fontWeight: 600, color: '#C97B6B' }}>{fmt(c.valor)}</td>
+                      <td style={{ padding: '8px 12px' }}>
+                        <span style={{ backgroundColor: cor[0], color: cor[1], borderRadius: 12, padding: '2px 10px', fontSize: 12, fontWeight: 600 }}>{c.situacao}</span>
+                      </td>
+                      <td style={{ padding: '8px 12px', fontSize: 13 }}>{c.dataPagamento ? dataBR(c.dataPagamento) : '—'}</td>
+                      <td style={{ padding: '8px 12px', fontSize: 13 }}>{c.valorPago != null ? fmt(c.valorPago) : '—'}</td>
+                      <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                        {c.situacao === 'ABERTA' && (<>
+                          <button type="button" onClick={() => setContaEmBaixa(c)}
+                            style={{ background: '#D4EDDA', color: '#2D6A4F', border: 'none', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', marginRight: 6 }}>Pagar</button>
+                          <button type="button" onClick={() => cancelarConta(c)}
+                            style={{ background: '#F8D7DA', color: '#721C24', border: 'none', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Cancelar</button>
+                        </>)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid #E8D5CC', backgroundColor: '#FDF0E8' }}>
+                  <td colSpan={2} style={{ padding: '8px 12px', fontWeight: 700, fontSize: 13 }}>Total</td>
+                  <td colSpan={5} style={{ padding: '8px 12px', fontWeight: 700, fontSize: 14, color: '#C97B6B' }}>
+                    {fmt(contasNota.filter(c => c.situacao !== 'CANCELADA').reduce((s, c) => s + c.valor, 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          ))}
 
         {/* Observações */}
         <SectionHeader label="Observações" />
@@ -675,6 +734,16 @@ export default function NotaEntradaForm() {
         </div>
       </div>
 
+      {contaEmBaixa && (
+        <BaixaContaModal
+          tipo="pagamento"
+          descricao={contaEmBaixa.descricao}
+          calcular={data => contasPagarService.calcularBaixa(contaEmBaixa.id, data).then(r => r.data)}
+          confirmar={data => contasPagarService.pagar(contaEmBaixa.id, data)}
+          onClose={() => setContaEmBaixa(null)}
+          onConcluido={() => { setContaEmBaixa(null); recarregarContas(); }}
+        />
+      )}
       {buscandoPedido && (
         <BuscarPedidoModal
           fornecedorId={fornecedor?.id ?? null}

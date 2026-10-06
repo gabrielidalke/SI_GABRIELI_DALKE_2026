@@ -26,7 +26,7 @@ public class ContasPagar {
     @Column(length = 200)
     private String descricao;
 
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal valor;
 
     @Column(name = "data_vencimento", nullable = false)
@@ -50,18 +50,18 @@ public class ContasPagar {
 
     // Resultado da baixa (ver CalculoBaixa)
     @Builder.Default
-    @Column(name = "valor_desconto", nullable = false, precision = 10, scale = 2)
+    @Column(name = "valor_desconto", nullable = false, precision = 12, scale = 2)
     private BigDecimal valorDesconto = BigDecimal.ZERO;
 
     @Builder.Default
-    @Column(name = "valor_multa", nullable = false, precision = 10, scale = 2)
+    @Column(name = "valor_multa", nullable = false, precision = 12, scale = 2)
     private BigDecimal valorMulta = BigDecimal.ZERO;
 
     @Builder.Default
-    @Column(name = "valor_juro", nullable = false, precision = 10, scale = 2)
+    @Column(name = "valor_juro", nullable = false, precision = 12, scale = 2)
     private BigDecimal valorJuro = BigDecimal.ZERO;
 
-    @Column(name = "valor_pago", precision = 10, scale = 2)
+    @Column(name = "valor_pago", precision = 12, scale = 2)
     private BigDecimal valorPago;
 
     @Builder.Default
@@ -70,6 +70,11 @@ public class ContasPagar {
 
     @Builder.Default
     private Boolean ativo = true;
+
+    // Conta gerada pela confirmação de uma Nota de Entrada (as quatro colunas da chave vêm juntas)
+    public boolean veioDeNota() {
+        return notaNumero != null;
+    }
 
     @CreationTimestamp
     @Column(name = "criado_em", updatable = false)

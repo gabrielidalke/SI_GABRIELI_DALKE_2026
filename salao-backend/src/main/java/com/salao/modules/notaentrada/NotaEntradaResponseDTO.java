@@ -1,5 +1,7 @@
 package com.salao.modules.notaentrada;
 
+import com.salao.modules.financeiro.ContasPagarResponseDTO;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,6 +28,8 @@ public record NotaEntradaResponseDTO(
         String situacao,
         PedidoInfo pedido,
         List<ItemInfo> itens,
+        // Contas a pagar geradas na confirmação (vazio enquanto a nota está PENDENTE)
+        List<ContasPagarResponseDTO> contasPagar,
         LocalDateTime criadoEm
 ) {
     public record FornecedorInfo(Long id, String nome, Boolean ativo) {}
@@ -48,7 +52,8 @@ public record NotaEntradaResponseDTO(
                 : null;
     }
 
-    public static NotaEntradaResponseDTO from(NotaEntrada n, List<NotaEntradaItem> itens) {
+    public static NotaEntradaResponseDTO from(NotaEntrada n, List<NotaEntradaItem> itens,
+                                              List<ContasPagarResponseDTO> contasPagar) {
         var fornecedor = n.getFornecedor() != null
                 ? new FornecedorInfo(n.getFornecedor().getId(), n.getFornecedor().getFornecedor(), n.getFornecedor().getAtivo())
                 : new FornecedorInfo(n.getId().getFornecedorId(), null, null);
@@ -74,6 +79,6 @@ public record NotaEntradaResponseDTO(
                 n.getValorProdutos(), n.getValorFrete(), n.getValorSeguro(), n.getOutrasDespesas(),
                 n.getValorDesconto(), n.getValorTotal(),
                 condicao, transportadora, n.getPlacaVeiculo(), n.getObservacoes(),
-                n.getSituacao(), pedidoDe(n), itensDto, n.getCriadoEm());
+                n.getSituacao(), pedidoDe(n), itensDto, contasPagar, n.getCriadoEm());
     }
 }

@@ -37,4 +37,6 @@ public interface NotaEntradaRepository extends JpaRepository<NotaEntrada, NotaEn
                                     @Param("modelo") Integer modelo, @Param("fornecedorId") Long fornecedorId);
 
     boolean existsByTransportadoraId(Long transportadoraId);
+
+    boolean existsByIdFornecedorId(Long fornecedorId);
 }

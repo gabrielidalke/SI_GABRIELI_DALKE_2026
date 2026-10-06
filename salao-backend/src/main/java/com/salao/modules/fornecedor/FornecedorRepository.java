@@ -2,4 +2,7 @@ package com.salao.modules.fornecedor;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface FornecedorRepository extends JpaRepository<Fornecedor, Long> {}
+public interface FornecedorRepository extends JpaRepository<Fornecedor, Long> {
+    boolean existsByCpfCnpj(String cpfCnpj);
+    boolean existsByCpfCnpjAndIdNot(String cpfCnpj, Long id);
+}

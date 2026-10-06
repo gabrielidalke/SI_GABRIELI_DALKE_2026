@@ -33,13 +33,13 @@ public class Fornecedor {
     @Column(length = 100)
     private String bairro;
 
-    @Column(length = 20)
+    @Column(length = 9)
     private String cep;
 
-    @Column(length = 20)
+    @Column(length = 15)
     private String fone;
 
-    @Column(name = "inscricao_estadual", length = 30)
+    @Column(name = "inscricao_estadual", length = 20)
     private String inscricaoEstadual;
 
     @Builder.Default

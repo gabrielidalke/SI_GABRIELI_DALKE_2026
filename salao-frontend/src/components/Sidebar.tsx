@@ -162,7 +162,6 @@ export default function Sidebar() {
         {fiscalAberto && (
           <div>
             {[
-              { label: 'Pedidos de Compra',       path: '/pedidos-compra' },
               { label: 'Notas de Entrada',         path: '/notas-entrada' },
               { label: 'Vendas',                   path: '/vendas' },
               { label: 'Notas Fiscais de Saída',   path: '/notas-fiscais-saida' },

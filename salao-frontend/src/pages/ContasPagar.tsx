@@ -147,7 +147,10 @@ export default function ContasPagar() {
               return (
                 <tr key={conta.id} style={{ borderTop: '1px solid #F0E6DC' }}>
                   <td style={{ ...td, color: '#8B6E63' }}>{conta.id}</td>
-                  <td style={{ ...td, fontWeight: 500 }}>{conta.descricao}</td>
+                  <td style={{ ...td, fontWeight: 500 }}>
+                    {conta.descricao}
+                    {conta.nota && <span style={sub}>Nota de Entrada {conta.nota.numero}/{conta.nota.serie} (mod. {conta.nota.modelo})</span>}
+                  </td>
                   <td style={td}>{nomeForn(conta.fornecedor)}</td>
                   <td style={{ ...td, color: '#C97B6B', fontWeight: 600 }}>
                     {brl(conta.valor)}
@@ -171,12 +174,12 @@ export default function ContasPagar() {
                     {conta.situacao === 'ABERTA' && (<>
                       <button style={aBtn('#D4EDDA', '#2D6A4F')} onClick={() => setBaixa(conta)}>Pagar</button>
                       <button style={aBtn('#F8D7DA', '#721C24')} onClick={() => handleCancelar(conta.id)}>Cancelar</button>
-                      <button style={{ ...btnEdit, marginRight: 0 }} onClick={() => abrirEditar(conta)}>Editar</button>
+                      {!conta.nota && <button style={{ ...btnEdit, marginRight: 0 }} onClick={() => abrirEditar(conta)}>Editar</button>}
                     </>)}
                     {conta.situacao === 'PAGA' && (
                       <button style={aBtn('#FDF0E8', '#8B6E63')} onClick={() => abrirEditar(conta, true)}>Ver</button>
                     )}
-                    {conta.situacao === 'CANCELADA' && (
+                    {conta.situacao === 'CANCELADA' && !conta.nota && (
                       <button style={btnDelete} onClick={() => handleDeletar(conta.id)}>Excluir</button>
                     )}
                   </td>

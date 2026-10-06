@@ -2,8 +2,10 @@ package com.salao.modules.fornecedor;
 
 import com.salao.modules.financeiro.ContasPagarRepository;
 import com.salao.modules.geo.cidade.CidadeRepository;
+import com.salao.modules.notaentrada.NotaEntradaRepository;
 import com.salao.modules.pagamento.CondicaoPagamento;
 import com.salao.modules.pagamento.CondicaoPagamentoRepository;
+import com.salao.modules.pedidocompra.PedidoCompraRepository;
 import com.salao.util.CpfCnpjValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,8 @@ public class FornecedorService {
     private final ContasPagarRepository contasPagarRepository;
     private final CidadeRepository cidadeRepository;
     private final CondicaoPagamentoRepository condicaoPagamentoRepository;
+    private final NotaEntradaRepository notaEntradaRepository;
+    private final PedidoCompraRepository pedidoCompraRepository;
 
     public List<FornecedorResponseDTO> listar() {
         return repository.findAll().stream().map(FornecedorResponseDTO::from).toList();
@@ -29,6 +33,9 @@ public class FornecedorService {
 
     public FornecedorResponseDTO criar(FornecedorRequestDTO dto) {
         validarCpfCnpj(dto.cpfCnpj());
+        String documento = CpfCnpjValidator.formatar(dto.cpfCnpj());
+        if (documento != null && repository.existsByCpfCnpj(documento))
+            throw new RuntimeException("Já existe um fornecedor cadastrado com este CPF/CNPJ.");
 
         var cidade = dto.cidadeId() != null
                 ? cidadeRepository.findById(dto.cidadeId())
@@ -37,13 +44,13 @@ public class FornecedorService {
         var condicaoPagamento = resolveCondicaoPagamento(dto.condicaoPagamentoId());
 
         var fornecedor = Fornecedor.builder()
-                .fornecedor(dto.fornecedor())
-                .cpfCnpj(dto.cpfCnpj())
-                .endereco(dto.endereco())
-                .bairro(dto.bairro())
+                .fornecedor(dto.fornecedor().trim())
+                .cpfCnpj(documento)
+                .endereco(vazioParaNulo(dto.endereco()))
+                .bairro(vazioParaNulo(dto.bairro()))
                 .cep(dto.cep())
                 .fone(dto.fone())
-                .inscricaoEstadual(dto.inscricaoEstadual())
+                .inscricaoEstadual(vazioParaNulo(dto.inscricaoEstadual()))
                 .ativo(dto.ativo() != null ? dto.ativo() : true)
                 .cidade(cidade)
                 .condicaoPagamento(condicaoPagamento)
@@ -56,18 +63,21 @@ public class FornecedorService {
         validarCpfCnpj(dto.cpfCnpj());
 
         var fornecedor = buscarEntidade(id);
+        String documento = CpfCnpjValidator.formatar(dto.cpfCnpj());
+        if (documento != null && repository.existsByCpfCnpjAndIdNot(documento, id))
+            throw new RuntimeException("Já existe um fornecedor cadastrado com este CPF/CNPJ.");
         var cidade = dto.cidadeId() != null
                 ? cidadeRepository.findById(dto.cidadeId())
                         .orElseThrow(() -> new RuntimeException("Cidade não encontrada"))
                 : null;
 
-        fornecedor.setFornecedor(dto.fornecedor());
-        fornecedor.setCpfCnpj(dto.cpfCnpj());
-        fornecedor.setEndereco(dto.endereco());
-        fornecedor.setBairro(dto.bairro());
+        fornecedor.setFornecedor(dto.fornecedor().trim());
+        fornecedor.setCpfCnpj(documento);
+        fornecedor.setEndereco(vazioParaNulo(dto.endereco()));
+        fornecedor.setBairro(vazioParaNulo(dto.bairro()));
         fornecedor.setCep(dto.cep());
         fornecedor.setFone(dto.fone());
-        fornecedor.setInscricaoEstadual(dto.inscricaoEstadual());
+        fornecedor.setInscricaoEstadual(vazioParaNulo(dto.inscricaoEstadual()));
         if (dto.ativo() != null) fornecedor.setAtivo(dto.ativo());
         fornecedor.setCidade(cidade);
         fornecedor.setCondicaoPagamento(resolveCondicaoPagamento(dto.condicaoPagamentoId()));
@@ -80,7 +90,15 @@ public class FornecedorService {
         if (!contasPagarRepository.findByFornecedorId(id).isEmpty()) {
             throw new RuntimeException("Fornecedor possui contas a pagar vinculadas e não pode ser excluído");
         }
+        if (notaEntradaRepository.existsByIdFornecedorId(id))
+            throw new RuntimeException("Fornecedor possui notas de entrada vinculadas e não pode ser excluído");
+        if (pedidoCompraRepository.existsByIdFornecedorId(id))
+            throw new RuntimeException("Fornecedor possui pedidos de compra vinculados e não pode ser excluído");
         repository.deleteById(id);
+    }
+
+    private String vazioParaNulo(String texto) {
+        return texto == null || texto.isBlank() ? null : texto.trim();
     }
 
     private void validarCpfCnpj(String cpfCnpj) {

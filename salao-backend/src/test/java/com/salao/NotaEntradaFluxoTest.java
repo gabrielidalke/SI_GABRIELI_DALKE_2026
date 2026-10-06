@@ -173,7 +173,7 @@ class NotaEntradaFluxoTest {
     @Test
     void confirmarGeraEstoqueContasAPagarEFechaANota() throws Exception {
         enviarPost("/api/notas-entrada", nota(1001, fornA, hoje.minusDays(2),
-                ",\"valorFrete\":30,\"valorSeguro\":8,\"condicaoPagamentoId\":" + condicao3060,
+                ",\"tipoFrete\":\"FOB\",\"valorFrete\":30,\"valorSeguro\":8,\"condicaoPagamentoId\":" + condicao3060,
                 item(shampoo, classMercadoria, "10", "20", "0"),
                 item(condicionador, classMercadoria, "5", "40", "10"))).andExpect(status().isCreated());
 
@@ -264,7 +264,7 @@ class NotaEntradaFluxoTest {
                 item(condicionador, classMercadoria, "5", "40", "0"))).andExpect(status().isCreated());
 
         // quantidade do shampoo -> 20, condicionador sai da nota, escova entra, frete 10
-        enviarPut(url(1001, fornA), nota(1001, fornA, hoje, ",\"valorFrete\":10",
+        enviarPut(url(1001, fornA), nota(1001, fornA, hoje, ",\"tipoFrete\":\"CIF\",\"valorFrete\":10",
                 item(shampoo, classMercadoria, "20", "20", "0"),
                 item(escova, classConsumo, "2", "5", "0")))
                 .andExpect(status().isOk())

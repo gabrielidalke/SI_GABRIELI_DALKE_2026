@@ -22,10 +22,12 @@ public record ContasPagarResponseDTO(
         BigDecimal valorDesconto,
         BigDecimal valorMulta,
         BigDecimal valorJuro,
-        BigDecimal valorPago
+        BigDecimal valorPago,
+        NotaInfo nota
 ) {
     public record FornecedorInfo(Long id, String fornecedor) {}
     public record ParcelaInfo(Long id, Integer diasVencimento) {}
+    public record NotaInfo(Integer modelo, Integer serie, Integer numero) {}
 
     public static ContasPagarResponseDTO from(ContasPagar c) {
         FornecedorInfo fornecedor = c.getFornecedor() != null
@@ -41,7 +43,8 @@ public record ContasPagarResponseDTO(
                 fornecedor, parcela,
                 c.getPercentualDesconto(), c.getPercentualMulta(), c.getPercentualJuro(),
                 c.getValor().subtract(CalculoBaixa.percentual(c.getValor(), c.getPercentualDesconto())),
-                c.getValorDesconto(), c.getValorMulta(), c.getValorJuro(), c.getValorPago()
+                c.getValorDesconto(), c.getValorMulta(), c.getValorJuro(), c.getValorPago(),
+                c.veioDeNota() ? new NotaInfo(c.getNotaModelo(), c.getNotaSerie(), c.getNotaNumero()) : null
         );
     }
 }

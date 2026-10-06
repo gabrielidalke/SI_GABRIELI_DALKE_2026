@@ -1,5 +1,6 @@
 package com.salao.modules.financeiro;
 
+import com.salao.modules.fornecedor.Fornecedor;
 import com.salao.modules.fornecedor.FornecedorRepository;
 import com.salao.modules.pagamento.Parcela;
 import com.salao.modules.pagamento.ParcelaRepository;
@@ -15,6 +16,8 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class ContasPagarService {
 
+    private static final LocalDate DATA_MINIMA = LocalDate.of(2000, 1, 1);
+
     private final ContasPagarRepository repository;
     private final FornecedorRepository fornecedorRepository;
     private final ParcelaRepository parcelaRepository;
@@ -28,8 +31,8 @@ public class ContasPagarService {
     }
 
     public ContasPagarResponseDTO criar(ContasPagarRequestDTO dto) {
-        var fornecedor = fornecedorRepository.findById(dto.fornecedorId())
-                .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
+        var fornecedor = buscarFornecedorAtivo(dto.fornecedorId());
+        validarVencimento(dto.dataVencimento());
         var parcela = dto.parcelaId() != null
                 ? parcelaRepository.findById(dto.parcelaId())
                         .orElseThrow(() -> new RuntimeException("Parcela não encontrada"))
@@ -52,8 +55,11 @@ public class ContasPagarService {
         var conta = buscarEntidade(id);
         if (!"ABERTA".equals(conta.getSituacao()))
             throw new RuntimeException("Só é possível editar contas em aberto");
-        var fornecedor = fornecedorRepository.findById(dto.fornecedorId())
-                .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
+        if (conta.veioDeNota())
+            throw new RuntimeException("Esta conta foi gerada pela Nota de Entrada " + conta.getNotaNumero() + "/"
+                    + conta.getNotaSerie() + " e não pode ser editada: só pode ser paga ou cancelada.");
+        var fornecedor = buscarFornecedorAtivo(dto.fornecedorId());
+        validarVencimento(dto.dataVencimento());
         var parcela = dto.parcelaId() != null
                 ? parcelaRepository.findById(dto.parcelaId())
                         .orElseThrow(() -> new RuntimeException("Parcela não encontrada"))
@@ -106,6 +112,8 @@ public class ContasPagarService {
         var conta = buscarEntidade(id);
         if (!"CANCELADA".equals(conta.getSituacao()))
             throw new RuntimeException("Só é possível excluir contas com situação CANCELADA");
+        if (conta.veioDeNota())
+            throw new RuntimeException("Contas geradas por uma Nota de Entrada não podem ser excluídas (ficam canceladas, como histórico da nota).");
         repository.deleteById(id);
     }
 
@@ -118,7 +126,23 @@ public class ContasPagarService {
         var dataPagamento = data != null ? data : LocalDate.now();
         if (dataPagamento.isAfter(LocalDate.now()))
             throw new RuntimeException("Data de pagamento não pode ser futura");
+        if (dataPagamento.isBefore(DATA_MINIMA))
+            throw new RuntimeException("Data de pagamento inválida.");
         return dataPagamento;
+    }
+
+    // Vencimento dentro de uma janela razoável: evita ano digitado errado (0202, 2062...)
+    private void validarVencimento(LocalDate vencimento) {
+        if (vencimento.isBefore(DATA_MINIMA) || vencimento.isAfter(LocalDate.now().plusYears(10)))
+            throw new RuntimeException("Data de vencimento inválida (deve estar entre 2000 e " + LocalDate.now().plusYears(10).getYear() + ").");
+    }
+
+    private Fornecedor buscarFornecedorAtivo(Long id) {
+        var fornecedor = fornecedorRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Fornecedor não encontrado"));
+        if (!Boolean.TRUE.equals(fornecedor.getAtivo()))
+            throw new RuntimeException("Fornecedor inativo.");
+        return fornecedor;
     }
 
     // Copia os termos da condição da parcela; alterar a condição depois não mexe nas contas já lançadas

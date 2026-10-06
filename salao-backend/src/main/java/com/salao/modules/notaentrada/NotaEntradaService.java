@@ -5,6 +5,7 @@ import com.salao.modules.classificacaoconta.ClassificacaoContaRepository;
 import com.salao.modules.estoque.MovimentacaoEstoqueService;
 import com.salao.modules.financeiro.ContasPagar;
 import com.salao.modules.financeiro.ContasPagarRepository;
+import com.salao.modules.financeiro.ContasPagarResponseDTO;
 import com.salao.modules.fornecedor.Fornecedor;
 import com.salao.modules.fornecedor.FornecedorRepository;
 import com.salao.modules.log.LogSistemaService;
@@ -41,6 +42,9 @@ import java.util.function.Function;
 public class NotaEntradaService {
 
     private static final BigDecimal CEM = BigDecimal.valueOf(100);
+    // Limite das colunas DECIMAL(12,2): passar disso estouraria o banco com um erro genérico
+    private static final BigDecimal LIMITE_VALOR = new BigDecimal("9999999999.99");
+    private static final LocalDate DATA_MINIMA = LocalDate.of(2000, 1, 1);
     private static final DateTimeFormatter DATA_BR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final NotaEntradaRepository repository;
@@ -204,6 +208,10 @@ public class NotaEntradaService {
         LocalDate hoje = LocalDate.now();
         if (dto.dataEmissao().isAfter(hoje))
             throw new RuntimeException("Data de emissão não pode ser posterior à data atual.");
+        if (dto.dataEmissao().isBefore(DATA_MINIMA))
+            throw new RuntimeException("Data de emissão inválida (anterior a 2000).");
+        if (valor(dto.valorFrete()).signum() > 0 && vazioParaNulo(dto.tipoFrete()) == null)
+            throw new RuntimeException("Informe o tipo de frete (CIF ou FOB) quando houver valor de frete.");
         if (dto.dataChegada() != null) {
             if (dto.dataChegada().isBefore(dto.dataEmissao()))
                 throw new RuntimeException("Data de chegada não pode ser anterior à data de emissão.");
@@ -257,11 +265,16 @@ public class NotaEntradaService {
                 throw new RuntimeException("A classificação da conta de um item já adicionado não pode ser alterada (produto "
                         + produto.getNome() + ").");
 
+            // O saldo do estoque é inteiro (unidades): aceitar 2,5 aqui faria o estoque arredondar e "perder" produto
+            if (dto.quantidade().stripTrailingZeros().scale() > 0)
+                throw new RuntimeException("Produto " + produto.getNome() + ": a quantidade deve ser um número inteiro (o estoque é controlado em unidades).");
             BigDecimal quantidade = dto.quantidade().setScale(3, RoundingMode.HALF_UP);
             BigDecimal valorUnitario = dto.valorUnitario().setScale(2, RoundingMode.HALF_UP);
             BigDecimal percentual = dto.descontoPercentual() != null
                     ? dto.descontoPercentual().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2);
             BigDecimal bruto = quantidade.multiply(valorUnitario).setScale(2, RoundingMode.HALF_UP);
+            if (bruto.compareTo(LIMITE_VALOR) > 0)
+                throw new RuntimeException("Produto " + produto.getNome() + ": o valor total do item é grande demais.");
             BigDecimal descontoValor = bruto.multiply(percentual).divide(CEM, 2, RoundingMode.HALF_UP);
 
             itens.add(NotaEntradaItem.builder()
@@ -293,10 +306,14 @@ public class NotaEntradaService {
             item.setCustoFinal(custoTotal.divide(item.getQuantidade(), 4, RoundingMode.HALF_UP));
         }
 
+        BigDecimal total = produtos.subtract(desconto)
+                .add(nota.getValorFrete()).add(nota.getValorSeguro()).add(nota.getOutrasDespesas());
+        if (produtos.compareTo(LIMITE_VALOR) > 0 || total.compareTo(LIMITE_VALOR) > 0)
+            throw new RuntimeException("O valor total da nota é grande demais (máximo R$ 9.999.999.999,99).");
+
         nota.setValorProdutos(produtos);
         nota.setValorDesconto(desconto);
-        nota.setValorTotal(produtos.subtract(desconto)
-                .add(nota.getValorFrete()).add(nota.getValorSeguro()).add(nota.getOutrasDespesas()));
+        nota.setValorTotal(total);
     }
 
     // Divide "total" entre os itens proporcionalmente ao valor líquido; o último item absorve o arredondamento
@@ -427,7 +444,10 @@ public class NotaEntradaService {
     }
 
     private NotaEntradaResponseDTO responder(NotaEntrada nota) {
-        return NotaEntradaResponseDTO.from(nota, itensDe(nota.getId()));
+        var id = nota.getId();
+        var contas = contasPagarRepository.findByNota(id.getNumero(), id.getSerie(), id.getModelo(), id.getFornecedorId())
+                .stream().map(ContasPagarResponseDTO::from).toList();
+        return NotaEntradaResponseDTO.from(nota, itensDe(id), contas);
     }
 
     private NotaEntrada buscarEntidade(NotaEntradaId id) {
@@ -464,8 +484,11 @@ public class NotaEntradaService {
 
     private CondicaoPagamento resolverCondicao(Long id) {
         if (id == null) return null;
-        return condicaoPagamentoRepository.findById(id)
+        var condicao = condicaoPagamentoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Condição de pagamento não encontrada."));
+        if (!Boolean.TRUE.equals(condicao.getAtivo()))
+            throw new RuntimeException("Condição de pagamento inativa.");
+        return condicao;
     }
 
     private Transportadora resolverTransportadora(Long id) {

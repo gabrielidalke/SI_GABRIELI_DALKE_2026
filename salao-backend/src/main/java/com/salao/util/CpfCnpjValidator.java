@@ -55,6 +55,16 @@ public final class CpfCnpjValidator {
         return digito2 == nums[13];
     }
 
+    // Forma gravada no banco (000.000.000-00 ou 00.000.000/0000-00): "123.456.789-09" e "12345678909" viram
+    // o mesmo texto, então a duplicidade é detectada. Assume documento já validado.
+    public static String formatar(String documento) {
+        if (documento == null || documento.isBlank()) return null;
+        String d = documento.replaceAll("\\D", "");
+        if (d.length() == 11)
+            return d.substring(0, 3) + "." + d.substring(3, 6) + "." + d.substring(6, 9) + "-" + d.substring(9);
+        return d.substring(0, 2) + "." + d.substring(2, 5) + "." + d.substring(5, 8) + "/" + d.substring(8, 12) + "-" + d.substring(12);
+    }
+
     private static int calcularDigito(int soma) {
         int resto = soma % 11;
         return resto < 2 ? 0 : 11 - resto;

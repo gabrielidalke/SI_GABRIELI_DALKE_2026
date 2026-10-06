@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { ContaPagar } from './contasPagarService';
 
 const API = 'http://localhost:8080/api';
 
@@ -65,6 +66,8 @@ export interface NotaEntrada {
   situacao: SituacaoNota;
   pedido?: PedidoRef | null;
   itens: NotaEntradaItem[];
+  // Contas a pagar geradas na confirmação (vazio enquanto PENDENTE)
+  contasPagar: ContaPagar[];
 }
 
 export interface NotaEntradaItemRequest {

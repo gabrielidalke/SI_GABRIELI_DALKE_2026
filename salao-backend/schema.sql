@@ -204,12 +204,12 @@ CREATE TABLE parcelas (
 CREATE TABLE fornecedores (
     id                    BIGSERIAL    PRIMARY KEY,
     fornecedor            VARCHAR(150) NOT NULL,
-    cpf_cnpj              VARCHAR(18)  UNIQUE,
+    cpf_cnpj              VARCHAR(18)  UNIQUE,   -- gravado formatado (000.000.000-00 / 00.000.000/0000-00)
     endereco              VARCHAR(200),
     bairro                VARCHAR(100),
-    cep                   VARCHAR(20),
-    fone                  VARCHAR(20),
-    inscricao_estadual    VARCHAR(30),
+    cep                   VARCHAR(9),            -- 00000-000
+    fone                  VARCHAR(15),           -- (00) 00000-0000
+    inscricao_estadual    VARCHAR(20),
     ativo                 BOOLEAN      NOT NULL DEFAULT TRUE,
     criado_em             TIMESTAMP    NOT NULL DEFAULT NOW(),
     atualizado_em         TIMESTAMP,
@@ -259,11 +259,11 @@ CREATE TABLE agendamento_servicos (
 CREATE TABLE transportadoras (
     id            BIGSERIAL    PRIMARY KEY,
     nome          VARCHAR(150) NOT NULL,
-    cpf_cnpj      VARCHAR(18),
-    fone          VARCHAR(20),
+    cpf_cnpj      VARCHAR(18) UNIQUE,            -- gravado formatado
+    fone          VARCHAR(15),
     endereco      VARCHAR(200),
     bairro        VARCHAR(100),
-    cep           VARCHAR(20),
+    cep           VARCHAR(9),
     ativo         BOOLEAN      NOT NULL DEFAULT TRUE,
     criado_em     TIMESTAMP    NOT NULL DEFAULT NOW(),
     atualizado_em TIMESTAMP,
@@ -426,7 +426,7 @@ CREATE TABLE notas_fiscais_servico (
 CREATE TABLE contas_pagar (
     id                     BIGSERIAL     PRIMARY KEY,
     descricao              VARCHAR(200),
-    valor                  DECIMAL(10,2) NOT NULL,
+    valor                  DECIMAL(12,2) NOT NULL CHECK (valor > 0),   -- 12,2 como o total da nota de entrada
     data_vencimento        DATE          NOT NULL,
     data_pagamento         DATE,
     -- termos da condição de pagamento, copiados no lançamento
@@ -434,11 +434,11 @@ CREATE TABLE contas_pagar (
     percentual_multa       DECIMAL(5,2)  NOT NULL DEFAULT 0,
     percentual_juro        DECIMAL(5,2)  NOT NULL DEFAULT 0,
     -- resultado da baixa: desconto se pago até o vencimento; multa + juro/mês pro rata se pago depois
-    valor_desconto         DECIMAL(10,2) NOT NULL DEFAULT 0,
-    valor_multa            DECIMAL(10,2) NOT NULL DEFAULT 0,
-    valor_juro             DECIMAL(10,2) NOT NULL DEFAULT 0,
-    valor_pago             DECIMAL(10,2),
-    situacao               VARCHAR(20)   NOT NULL DEFAULT 'ABERTA',
+    valor_desconto         DECIMAL(12,2) NOT NULL DEFAULT 0,
+    valor_multa            DECIMAL(12,2) NOT NULL DEFAULT 0,
+    valor_juro             DECIMAL(12,2) NOT NULL DEFAULT 0,
+    valor_pago             DECIMAL(12,2),
+    situacao               VARCHAR(20)   NOT NULL DEFAULT 'ABERTA' CHECK (situacao IN ('ABERTA', 'PAGA', 'CANCELADA')),
     ativo                  BOOLEAN       NOT NULL DEFAULT TRUE,
     criado_em              TIMESTAMP     NOT NULL DEFAULT NOW(),
     atualizado_em          TIMESTAMP,
@@ -449,9 +449,13 @@ CREATE TABLE contas_pagar (
     nota_serie             INTEGER,
     nota_modelo            INTEGER,
     nota_fornecedor_id     BIGINT,
+    CONSTRAINT ck_contas_pagar_nota CHECK (
+        (nota_numero IS NULL AND nota_serie IS NULL AND nota_modelo IS NULL AND nota_fornecedor_id IS NULL)
+        OR (nota_numero IS NOT NULL AND nota_serie IS NOT NULL AND nota_modelo IS NOT NULL AND nota_fornecedor_id IS NOT NULL)),
     FOREIGN KEY (nota_numero, nota_serie, nota_modelo, nota_fornecedor_id)
         REFERENCES notas_entrada (numero, serie, modelo, fornecedor_id)
 );
+CREATE INDEX idx_contas_pagar_nota ON contas_pagar (nota_fornecedor_id, nota_modelo, nota_serie, nota_numero);
 
 CREATE TABLE contas_receber (
     id                   BIGSERIAL     PRIMARY KEY,
