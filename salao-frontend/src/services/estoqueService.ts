@@ -10,6 +10,8 @@ export interface MovimentacaoEstoque {
   saldoAnterior?: number | null;
   saldoResultante: number;
   custoUnitario?: number | null;
+  custoMedioAnterior?: number | null;
+  custoMedioPosterior?: number | null;
   origemTipo?: string;
   origemId?: number;
   documento?: string | null;

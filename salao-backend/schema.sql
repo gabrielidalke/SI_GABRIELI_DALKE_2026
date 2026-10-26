@@ -223,6 +223,7 @@ CREATE TABLE produtos (
     descricao          VARCHAR(255),
     preco_venda        DECIMAL(10,2) NOT NULL,
     preco_custo        DECIMAL(10,2),
+    custo_medio        DECIMAL(12,4) NOT NULL DEFAULT 0 CHECK (custo_medio >= 0),  -- média ponderada das entradas
     desconto           DECIMAL(5,2)  NOT NULL DEFAULT 0,
     quantidade         INT           NOT NULL DEFAULT 0,
     ativo              BOOLEAN       NOT NULL DEFAULT TRUE,
@@ -325,11 +326,15 @@ CREATE TABLE notas_entrada (
     valor_desconto        DECIMAL(12,2) NOT NULL DEFAULT 0,
     valor_total           DECIMAL(12,2) NOT NULL DEFAULT 0,
     condicao_pagamento_id BIGINT        REFERENCES condicoes_pagamento(id),
+    forma_pagamento_id    BIGINT        REFERENCES formas_pagamento(id),   -- sugerida pela condição, pode ser trocada
     transportadora_id     BIGINT        REFERENCES transportadoras(id),
     placa_veiculo         VARCHAR(10),
     observacoes           VARCHAR(500),
     -- PENDENTE: pode editar, excluir e confirmar | CONFERIDA: efetivada (estoque e contas a pagar gerados)
-    situacao              VARCHAR(10)   NOT NULL DEFAULT 'PENDENTE' CHECK (situacao IN ('PENDENTE', 'CONFERIDA')),
+    -- CANCELADA: desfeita (estoque estornado, contas canceladas), sempre com motivo
+    situacao              VARCHAR(10)   NOT NULL DEFAULT 'PENDENTE' CHECK (situacao IN ('PENDENTE', 'CONFERIDA', 'CANCELADA')),
+    motivo_cancelamento   VARCHAR(300),
+    cancelado_em          TIMESTAMP,
     -- Pedido de Compra de origem (opcional): os três campos juntos, ou nenhum
     pedido_numero         INTEGER,
     pedido_serie          INTEGER,
@@ -338,6 +343,9 @@ CREATE TABLE notas_entrada (
     atualizado_em         TIMESTAMP,
     PRIMARY KEY (numero, serie, modelo, fornecedor_id),
     CONSTRAINT ck_nota_entrada_chegada CHECK (data_chegada IS NULL OR data_chegada >= data_emissao),
+    CONSTRAINT ck_nota_entrada_cancelamento CHECK (
+        (situacao = 'CANCELADA' AND motivo_cancelamento IS NOT NULL AND length(trim(motivo_cancelamento)) > 0)
+        OR (situacao <> 'CANCELADA' AND motivo_cancelamento IS NULL)),
     CONSTRAINT ck_nota_entrada_pedido CHECK (
         (pedido_numero IS NULL AND pedido_serie IS NULL AND pedido_modelo IS NULL)
         OR (pedido_numero IS NOT NULL AND pedido_serie IS NOT NULL AND pedido_modelo IS NOT NULL)),
@@ -444,6 +452,7 @@ CREATE TABLE contas_pagar (
     atualizado_em          TIMESTAMP,
     fornecedor_id          BIGINT REFERENCES fornecedores(id),
     parcela_id             BIGINT REFERENCES parcelas(id),
+    forma_pagamento_id     BIGINT REFERENCES formas_pagamento(id),
     -- Nota de Entrada que originou a conta (chave composta; nulos = conta lançada manualmente)
     nota_numero            INTEGER,
     nota_serie             INTEGER,
@@ -494,7 +503,9 @@ CREATE TABLE movimentacoes_estoque (
     saldo_anterior   INTEGER,
     saldo_resultante INTEGER       NOT NULL,   -- saldo posterior ao movimento
     custo_unitario   DECIMAL(12,4),
-    origem_tipo      VARCHAR(20),              -- NOTA_ENTRADA, VENDA
+    custo_medio_anterior  DECIMAL(12,4),
+    custo_medio_posterior DECIMAL(12,4),
+    origem_tipo      VARCHAR(20),              -- NOTA_ENTRADA, VENDA, CANCELAMENTO_NOTA
     origem_id        BIGINT,
     documento        VARCHAR(120),             -- ex.: "Entrada da Nota 12345/1 - Fornecedor 10"
     criado_em        TIMESTAMP     NOT NULL DEFAULT NOW()

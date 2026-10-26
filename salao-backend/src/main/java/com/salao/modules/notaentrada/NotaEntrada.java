@@ -2,6 +2,7 @@ package com.salao.modules.notaentrada;
 
 import com.salao.modules.fornecedor.Fornecedor;
 import com.salao.modules.pagamento.CondicaoPagamento;
+import com.salao.modules.pagamento.FormaPagamento;
 import com.salao.modules.transportadora.Transportadora;
 import jakarta.persistence.*;
 import lombok.*;
@@ -69,6 +70,11 @@ public class NotaEntrada {
     @JoinColumn(name = "condicao_pagamento_id")
     private CondicaoPagamento condicaoPagamento;
 
+    // Sugerida pela condição de pagamento (forma da 1ª parcela), mas pode ser trocada na nota
+    @ManyToOne
+    @JoinColumn(name = "forma_pagamento_id")
+    private FormaPagamento formaPagamento;
+
     @ManyToOne
     @JoinColumn(name = "transportadora_id")
     private Transportadora transportadora;
@@ -79,10 +85,17 @@ public class NotaEntrada {
     @Column(length = 500)
     private String observacoes;
 
-    // PENDENTE (editável/excluível/confirmável) ou CONFERIDA (efetivada; só leitura). Nasce sempre PENDENTE.
+    // PENDENTE (editável/excluível/confirmável), CONFERIDA (efetivada; só leitura) ou CANCELADA (desfeita, com motivo).
+    // Nasce sempre PENDENTE.
     @Builder.Default
     @Column(nullable = false, length = 10)
     private String situacao = "PENDENTE";
+
+    @Column(name = "motivo_cancelamento", length = 300)
+    private String motivoCancelamento;
+
+    @Column(name = "cancelado_em")
+    private LocalDateTime canceladoEm;
 
     // Pedido de Compra de origem (opcional): os três campos juntos, ou nenhum
     @Column(name = "pedido_numero")

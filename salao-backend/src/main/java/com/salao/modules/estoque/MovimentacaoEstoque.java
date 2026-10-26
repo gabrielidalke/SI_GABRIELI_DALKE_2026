@@ -40,6 +40,12 @@ public class MovimentacaoEstoque {
     @Column(name = "custo_unitario", precision = 12, scale = 4)
     private BigDecimal custoUnitario;
 
+    @Column(name = "custo_medio_anterior", precision = 12, scale = 4)
+    private BigDecimal custoMedioAnterior;
+
+    @Column(name = "custo_medio_posterior", precision = 12, scale = 4)
+    private BigDecimal custoMedioPosterior;
+
     @Column(name = "origem_tipo", length = 20)
     private String origemTipo;
 

@@ -3,7 +3,7 @@ import type { ContaPagar } from './contasPagarService';
 
 const API = 'http://localhost:8080/api';
 
-export type SituacaoNota = 'PENDENTE' | 'CONFERIDA';
+export type SituacaoNota = 'PENDENTE' | 'CONFERIDA' | 'CANCELADA';
 
 // A Nota de Entrada NÃO tem ID: ela é identificada por Modelo + Série + Número + Fornecedor
 export interface NotaEntradaChave {
@@ -60,10 +60,13 @@ export interface NotaEntrada {
   valorDesconto: number;
   valorTotal: number;
   condicaoPagamento?: { id: number; condicao: string } | null;
+  formaPagamento?: { id: number; formaPagamento: string } | null;
   transportadora?: { id: number; nome: string; ativo?: boolean } | null;
   placaVeiculo?: string | null;
   observacoes?: string | null;
   situacao: SituacaoNota;
+  motivoCancelamento?: string | null;
+  canceladoEm?: string | null;
   pedido?: PedidoRef | null;
   itens: NotaEntradaItem[];
   // Contas a pagar geradas na confirmação (vazio enquanto PENDENTE)
@@ -86,6 +89,7 @@ export interface NotaEntradaRequest extends NotaEntradaChave {
   valorSeguro: number;
   outrasDespesas: number;
   condicaoPagamentoId?: number | null;
+  formaPagamentoId?: number | null;
   transportadoraId?: number | null;
   placaVeiculo?: string;
   observacoes?: string;
@@ -109,6 +113,7 @@ export const notaEntradaService = {
   criar:     (dto: NotaEntradaRequest) => axios.post<NotaEntrada>(`${API}/notas-entrada`, dto),
   atualizar: (c: NotaEntradaChave, dto: NotaEntradaRequest) => axios.put<NotaEntrada>(caminho(c), dto),
   confirmar: (c: NotaEntradaChave) => axios.post<NotaEntrada>(`${caminho(c)}/confirmar`),
+  cancelar:  (c: NotaEntradaChave, motivo: string) => axios.post<NotaEntrada>(`${caminho(c)}/cancelar`, { motivo }),
   excluir:   (c: NotaEntradaChave) => axios.delete(caminho(c)),
 };
 

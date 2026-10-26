@@ -11,6 +11,8 @@ public record MovimentacaoEstoqueResponseDTO(
         Integer saldoAnterior,
         Integer saldoResultante,
         BigDecimal custoUnitario,
+        BigDecimal custoMedioAnterior,
+        BigDecimal custoMedioPosterior,
         String origemTipo,
         Long origemId,
         String documento,
@@ -25,6 +27,7 @@ public record MovimentacaoEstoqueResponseDTO(
         return new MovimentacaoEstoqueResponseDTO(
                 m.getId(), produto, m.getTipo(), m.getQuantidade(),
                 m.getSaldoAnterior(), m.getSaldoResultante(), m.getCustoUnitario(),
+                m.getCustoMedioAnterior(), m.getCustoMedioPosterior(),
                 m.getOrigemTipo(), m.getOrigemId(), m.getDocumento(), m.getCriadoEm()
         );
     }

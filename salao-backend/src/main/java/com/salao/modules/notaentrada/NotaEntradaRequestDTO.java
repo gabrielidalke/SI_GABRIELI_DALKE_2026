@@ -36,6 +36,7 @@ public record NotaEntradaRequestDTO(
         @PositiveOrZero(message = "Outras despesas não pode ser negativo")
         @Digits(integer = 10, fraction = 2, message = "Outras despesas inválido (máximo 2 decimais)") BigDecimal outrasDespesas,
         Long condicaoPagamentoId,
+        Long formaPagamentoId,
         Long transportadoraId,
         @Pattern(regexp = "[A-Za-z]{3}-?\\d[A-Za-z0-9]\\d{2}", message = "Placa inválida (use ABC-1234 ou ABC1D23)") String placaVeiculo,
         @Size(max = 500, message = "Observações deve ter no máximo 500 caracteres") String observacoes,

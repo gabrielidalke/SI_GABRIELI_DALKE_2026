@@ -201,10 +201,8 @@ class ContasPagarNaNotaEValidacoesTest {
         // 3 casas decimais zeradas (2.000) é inteiro
         enviarPost("/api/notas-entrada", nota(2, fornA, hoje, "", item(shampoo, "2.000", "10", "0"))).andExpect(status().isCreated());
 
+        // tipo de frete saiu da tela: nota com frete e sem tipo de frete é aceita
         enviarPost("/api/notas-entrada", nota(3, fornA, hoje, ",\"valorFrete\":15", item(shampoo, "1", "10", "0")))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensagem").value("Informe o tipo de frete (CIF ou FOB) quando houver valor de frete."));
-        enviarPost("/api/notas-entrada", nota(4, fornA, hoje, ",\"tipoFrete\":\"CIF\",\"valorFrete\":15", item(shampoo, "1", "10", "0")))
                 .andExpect(status().isCreated());
 
         enviarPost("/api/notas-entrada", nota(5, fornA, hoje, ",\"condicaoPagamentoId\":" + condicaoInativa, item(shampoo, "1", "10", "0")))

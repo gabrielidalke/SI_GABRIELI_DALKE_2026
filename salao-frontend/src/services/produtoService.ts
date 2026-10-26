@@ -19,6 +19,7 @@ export interface Produto {
   categoriaId?: number | null;
   categoria?: { id: number; nome: string };
   precoCusto?: number;
+  custoMedio?: number;
   desconto?: number;
 }
 

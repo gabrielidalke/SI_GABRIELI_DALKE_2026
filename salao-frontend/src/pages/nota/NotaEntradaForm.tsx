@@ -8,14 +8,15 @@ import {
 import { pedidoCompraService, type PedidoCompra } from '../../services/pedidoCompraService';
 import { condicaoPagamentoService, type CondicaoPagamento, type ParcelaPrevia } from '../../services/condicaoPagamentoService';
 import { classificacaoContaService, type ClassificacaoConta } from '../../services/classificacaoContaService';
+import { formaPagamentoService, type FormaPagamento } from '../../services/formaPagamentoService';
 import { produtoService, type Produto } from '../../services/produtoService';
-import type { Fornecedor } from '../../services/fornecedorService';
+import { fornecedorService, type Fornecedor } from '../../services/fornecedorService';
 import BuscarPedidoModal from '../../components/BuscarPedidoModal';
 import BaixaContaModal from '../../components/BaixaContaModal';
 import { contasPagarService, type ContaPagar } from '../../services/contasPagarService';
 import CampoBusca from '../../components/CampoBusca';
 import { BuscarFornecedorModal, BuscarTransportadoraModal } from '../../components/BuscaCadastros';
-import { PainelProduto, TabelaItens, BlocoTotais } from '../../components/ItensCompra';
+import { PainelProduto, TabelaItens } from '../../components/ItensCompra';
 import { useItensCompra } from '../../utils/useItensCompra';
 import {
   calcularItem, dataBR, despesasVazias, fmt, hojeISO, inteiroPositivo, somar, totalGeral, valorDe,
@@ -25,15 +26,18 @@ import { inputStyle, labelStyle, card, pageTitle, pageSubtitle, th, erroBanner, 
 
 const sel: CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 24 };
-// Modelo | Série | Número | Fornecedor | Emissão | Chegada (as datas ficam ao lado do fornecedor)
+// Modelo | Série | Nº da NF | Cód. | Fornecedor | CPF/CNPJ
 const linhaChave: CSSProperties = {
   display: 'grid', gap: 16, marginBottom: 16,
-  gridTemplateColumns: 'minmax(70px,0.8fr) minmax(70px,0.8fr) minmax(100px,1.2fr) minmax(200px,3fr) minmax(140px,1.5fr) minmax(140px,1.5fr)',
+  gridTemplateColumns: 'minmax(70px,0.8fr) minmax(70px,0.8fr) minmax(100px,1.2fr) minmax(60px,0.6fr) minmax(220px,3.4fr) minmax(170px,1.7fr)',
 };
+// Emissão | Entrada
+const linhaDatas: CSSProperties = { display: 'grid', gap: 16, marginBottom: 8, gridTemplateColumns: 'minmax(160px,220px) minmax(160px,220px)' };
+const somenteExibicao: CSSProperties = { ...inputStyle, backgroundColor: '#F5F0ED', color: '#8B6E63' };
+const valorFechamento: CSSProperties = { ...somenteExibicao, textAlign: 'right', fontWeight: 600, color: '#3D2B1F' };
 const dicaErro: CSSProperties = { fontSize: 11, color: '#721C24', marginTop: 4, marginBottom: 0 };
 const dica: CSSProperties = { fontSize: 11, color: '#8B6E63', marginTop: 4, marginBottom: 0 };
 const aviso: CSSProperties = { backgroundColor: '#FFF3CD', color: '#856404', padding: '10px 14px', borderRadius: 8, fontSize: 13 };
-const PLACA = /^[A-Z]{3}-?\d[A-Z0-9]\d{2}$/;
 // Num salão a compra vem direto pela Nota de Entrada: a busca de Pedido de Compra fica escondida (a tela continua
 // existindo; troque para true para voltar a oferecer o vínculo em notas novas)
 const OFERECER_PEDIDO_COMPRA = false;
@@ -66,7 +70,7 @@ export default function NotaEntradaForm() {
 
   // chave da nota
   const [chave, setChave] = useState({ modelo: '', serie: '', numero: '' });
-  const [fornecedor, setFornecedor] = useState<{ id: number; nome: string } | null>(null);
+  const [fornecedor, setFornecedor] = useState<{ id: number; nome: string; cpfCnpj?: string } | null>(null);
   const [chaveValidada, setChaveValidada] = useState(false);
   const [erroChave, setErroChave] = useState('');
   const [validando, setValidando] = useState(false);
@@ -82,8 +86,8 @@ export default function NotaEntradaForm() {
   const [avisoPedido, setAvisoPedido] = useState('');
 
   const [form, setForm] = useState({
-    dataEmissao: '', dataChegada: '', tipoFrete: '' as '' | 'CIF' | 'FOB',
-    condicaoPagamentoId: '' as number | '', placaVeiculo: '', observacoes: '',
+    dataEmissao: '', dataChegada: '',
+    condicaoPagamentoId: '' as number | '', formaPagamentoId: '' as number | '', observacoes: '',
   });
   const [transportadora, setTransportadora] = useState<{ id: number; nome: string } | null>(null);
   const [despesas, setDespesas] = useState<Despesas>(despesasVazias);
@@ -93,6 +97,7 @@ export default function NotaEntradaForm() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [classificacoes, setClassificacoes] = useState<ClassificacaoConta[]>([]);
   const [condicoes, setCondicoes] = useState<CondicaoPagamento[]>([]);
+  const [formas, setFormas] = useState<FormaPagamento[]>([]);
   const lista = useItensCompra(produtos);
   // regra da nota: depois que ela tem produtos, a chave não pode mais ser trocada
   const podeTrocarChave = isNovo && chaveValidada && lista.itens.length === 0;
@@ -103,6 +108,7 @@ export default function NotaEntradaForm() {
   const [avisoParcelas, setAvisoParcelas] = useState('');
 
   const [situacao, setSituacao] = useState<SituacaoNota | null>(null);
+  const [motivoCancelamento, setMotivoCancelamento] = useState('');
   // contas a pagar geradas pela confirmação (a nota conferida mostra e permite pagar)
   const [contasNota, setContasNota] = useState<ContaPagar[]>([]);
   const [contaEmBaixa, setContaEmBaixa] = useState<ContaPagar | null>(null);
@@ -110,7 +116,8 @@ export default function NotaEntradaForm() {
   const [carregando, setCarregando] = useState(!isNovo);
   const [salvando, setSalvando] = useState(false);
 
-  const somenteLeitura = situacao === 'CONFERIDA';
+  const cancelada = situacao === 'CANCELADA';
+  const somenteLeitura = situacao === 'CONFERIDA' || cancelada;
   // depois de gerar as parcelas a nota fica travada; só remover um produto destrava (e descarta as parcelas)
   const parcelasGeradas = parcelas != null && !somenteLeitura;
   const formLiberado = chaveValidada && !somenteLeitura && !parcelasGeradas;
@@ -132,18 +139,28 @@ export default function NotaEntradaForm() {
       produtoService.listar(),
       classificacaoContaService.listar(),
       condicaoPagamentoService.listar(),
-    ]).then(([p, c, cp]) => {
+      formaPagamentoService.listar(),
+    ]).then(([p, c, cp, fp]) => {
       setProdutos(p.data);
       setClassificacoes(c.data);
       setCondicoes(cp.data);
+      setFormas(fp.data);
     }).catch(e => setErro(mensagemDeErro(e, 'Erro ao carregar os cadastros de apoio.')));
   }, []);
+
+  useEffect(() => {
+    if (!fornecedor || fornecedor.cpfCnpj !== undefined) return;
+    fornecedorService.buscar(fornecedor.id)
+      .then(r => setFornecedor(prev => (prev && prev.id === r.data.id ? { ...prev, cpfCnpj: r.data.cpfCnpj ?? '' } : prev)))
+      .catch(() => { /* sem o documento a nota continua funcionando */ });
+  }, [fornecedor]);
 
   useEffect(() => {
     if (!chaveEdicao) return;
     notaEntradaService.buscar(chaveEdicao).then(r => {
       const n = r.data;
       setSituacao(n.situacao);
+      setMotivoCancelamento(n.motivoCancelamento ?? '');
       setChave({ modelo: String(n.modelo), serie: String(n.serie), numero: String(n.numero) });
       setFornecedor({ id: n.fornecedor.id, nome: n.fornecedor.nome ?? '' });
       setChaveValidada(true);
@@ -154,9 +171,10 @@ export default function NotaEntradaForm() {
           .catch(() => { /* sem a data, o servidor ainda valida ao salvar */ });
       }
       setForm({
-        dataEmissao: n.dataEmissao, dataChegada: n.dataChegada ?? '', tipoFrete: n.tipoFrete ?? '',
+        dataEmissao: n.dataEmissao, dataChegada: n.dataChegada ?? '',
         condicaoPagamentoId: n.condicaoPagamento?.id ?? '',
-        placaVeiculo: n.placaVeiculo ?? '', observacoes: n.observacoes ?? '',
+        formaPagamentoId: n.formaPagamento?.id ?? '',
+        observacoes: n.observacoes ?? '',
       });
       setTransportadora(n.transportadora ? { id: n.transportadora.id, nome: n.transportadora.nome } : null);
       setDespesas({ valorFrete: textoValor(n.valorFrete), valorSeguro: textoValor(n.valorSeguro), outrasDespesas: textoValor(n.outrasDespesas) });
@@ -215,11 +233,21 @@ export default function NotaEntradaForm() {
 
   const chavePreenchida = () => inteiroPositivo(chave.modelo) && inteiroPositivo(chave.serie) && inteiroPositivo(chave.numero);
 
+  // Forma de pagamento cadastrada na condição (a da 1ª parcela); a pessoa pode trocar depois
+  const formaDaCondicao = (id: number | ''): number | '' => {
+    const parcelas = condicoes.find(c => c.id === id)?.parcelas ?? [];
+    const primeira = [...parcelas].sort((a, b) => a.numeroParcela - b.numeroParcela)[0];
+    return primeira?.formaPagamento?.id ?? '';
+  };
+
+  const escolherCondicao = (id: number | '') =>
+    setCampo({ condicaoPagamentoId: id, formaPagamentoId: formaDaCondicao(id) });
+
   // A condição de pagamento é sugerida (pelo fornecedor ou pelo pedido) só se a pessoa não escolheu outra
   const sugerirCondicao = (id: number | undefined, de: 'fornecedor' | 'pedido') => {
     if (id == null) return;
     if (form.condicaoPagamentoId === '' || form.condicaoPagamentoId === origemCondicao?.id) {
-      setForm(prev => ({ ...prev, condicaoPagamentoId: id }));
+      setForm(prev => ({ ...prev, condicaoPagamentoId: id, formaPagamentoId: formaDaCondicao(id) }));
       setOrigemCondicao({ id, de });
     }
   };
@@ -277,6 +305,7 @@ export default function NotaEntradaForm() {
   const custoAdicional = valorDe(despesas.valorFrete) + valorDe(despesas.valorSeguro) + valorDe(despesas.outrasDespesas);
   const totalLiquido = somar(lista.itens.map(calcularItem)).liquido;
   const totalNota = totalGeral(lista.itens, despesas);
+  const totalProdutos = somar(lista.itens.map(calcularItem)).liquido;
   const rateioDoItem = (liquido: number) =>
     totalLiquido > 0 ? custoAdicional * (liquido / totalLiquido) : (lista.itens.length > 0 ? custoAdicional / lista.itens.length : 0);
   const custoFinalDoItem = (c: ItemCalculado) => {
@@ -291,8 +320,9 @@ export default function NotaEntradaForm() {
 
   // Como a nota trava depois de gerar, tudo o que impediria salvar é conferido antes
   const problemaAntesDeGerar = (): string => {
-    if (!form.dataEmissao) return 'Informe a data de emissão para gerar as parcelas.';
-    if (erroEmissao || erroChegada || erroPlaca) return erroEmissao || erroChegada || erroPlaca;
+    if (!chaveValidada) return 'Informe Modelo, Série, Nº da NF e Fornecedor e valide a chave.';
+    if (!form.dataEmissao) return 'Informe a data de emissão.';
+    if (erroEmissao || erroChegada) return erroEmissao || erroChegada;
     if (totalNota <= 0) return 'Adicione os produtos: o valor total da nota precisa ser maior que zero.';
     if (lista.editingKey != null) return 'Termine a edição do produto (Atualizar Produto ou Cancelar) antes de gerar as parcelas.';
     const semClassificacao = lista.itens.findIndex(i => !i.classificacaoContaId);
@@ -335,7 +365,7 @@ export default function NotaEntradaForm() {
     }
   };
 
-  // ------------------------------------------------------------------ validações de data/placa (ao vivo)
+  // ------------------------------------------------------------------ validações de data (ao vivo)
 
   const erroEmissao = !form.dataEmissao ? ''
     : form.dataEmissao > hoje ? 'Data de emissão não pode ser posterior à data atual.'
@@ -345,7 +375,6 @@ export default function NotaEntradaForm() {
     ? (form.dataEmissao && form.dataChegada < form.dataEmissao ? 'Data de chegada não pode ser anterior à data de emissão.'
       : form.dataChegada > hoje ? 'Data de chegada não pode ser posterior à data atual.' : '')
     : '';
-  const erroPlaca = form.placaVeiculo && !PLACA.test(form.placaVeiculo) ? 'Placa inválida (use ABC-1234 ou ABC1D23).' : '';
 
   // ------------------------------------------------------------------ salvar
 
@@ -354,7 +383,6 @@ export default function NotaEntradaForm() {
     if (!form.dataEmissao) { mostrarErro('Data de emissão é obrigatória.'); return null; }
     if (erroEmissao) { mostrarErro(erroEmissao); return null; }
     if (erroChegada) { mostrarErro(erroChegada); return null; }
-    if (erroPlaca) { mostrarErro(erroPlaca); return null; }
     for (const [idx, i] of lista.itens.entries()) {
       if (!i.classificacaoContaId) {
         mostrarErro(`Selecione a classificação da conta do item ${idx + 1} (${lista.produtoDe(i.produtoId)?.nome ?? 'produto'}).`);
@@ -366,11 +394,10 @@ export default function NotaEntradaForm() {
       fornecedorId: fornecedor.id,
       dataEmissao: form.dataEmissao,
       dataChegada: form.dataChegada || undefined,
-      tipoFrete: form.tipoFrete || undefined,
       valorFrete: valorDe(despesas.valorFrete), valorSeguro: valorDe(despesas.valorSeguro), outrasDespesas: valorDe(despesas.outrasDespesas),
       condicaoPagamentoId: form.condicaoPagamentoId || null,
+      formaPagamentoId: form.formaPagamentoId || null,
       transportadoraId: transportadora?.id ?? null,
-      placaVeiculo: form.placaVeiculo.trim() || undefined,
       observacoes: form.observacoes.trim() || undefined,
       pedidoNumero: pedido?.numero ?? null, pedidoSerie: pedido?.serie ?? null, pedidoModelo: pedido?.modelo ?? null,
       itens: lista.itens.map(i => ({
@@ -416,9 +443,13 @@ export default function NotaEntradaForm() {
 
   // ------------------------------------------------------------------ tela
 
+  // "Gerar parcelas" só fica liberado com todo o obrigatório da nota preenchido
+  const pendenciaParaGerar = somenteLeitura || parcelasGeradas ? '' : problemaAntesDeGerar();
+  const podeGerarParcelas = formLiberado && !gerandoParcelas && !pendenciaParaGerar;
+
   if (carregando) return <div style={{ padding: 32 }}>Carregando...</div>;
 
-  const titulo = somenteLeitura ? 'Nota de Entrada (conferida)' : (isNovo ? 'Nova Nota de Entrada' : 'Editar Nota de Entrada');
+  const titulo = cancelada ? 'Nota de Entrada (cancelada)' : somenteLeitura ? 'Nota de Entrada (conferida)' : (isNovo ? 'Nova Nota de Entrada' : 'Editar Nota de Entrada');
   const classifTravadaNoPainel = lista.novoItem.produtoId !== '' && (
     classificacoesOriginais[lista.novoItem.produtoId] !== undefined
     || (lista.editingKey != null && lista.itens.find(i => i._key === lista.editingKey)?.persistido === true));
@@ -434,17 +465,24 @@ export default function NotaEntradaForm() {
         </div>
         {situacao && (
           <span style={{
-            backgroundColor: somenteLeitura ? '#D4EDDA' : '#FFF3CD', color: somenteLeitura ? '#2D6A4F' : '#856404',
+            backgroundColor: cancelada ? '#F0E6DC' : somenteLeitura ? '#D4EDDA' : '#FFF3CD',
+            color: cancelada ? '#8B6E63' : somenteLeitura ? '#2D6A4F' : '#856404',
             padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 700,
-          }}>{somenteLeitura ? 'CONFERIDA' : 'PENDENTE'}</span>
+          }}>{situacao}</span>
         )}
       </div>
 
       <div style={{ ...card, padding: 32 }}>
         {erro && <p style={erroBanner}>{erro}</p>}
-        {somenteLeitura && (
+        {cancelada && (
+          <p style={{ backgroundColor: '#F0E6DC', color: '#8B6E63', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginTop: 0 }}>
+            Nota cancelada: a entrada foi estornada do estoque e as contas a pagar foram canceladas.
+            <br /><strong>Motivo:</strong> {motivoCancelamento}
+          </p>
+        )}
+        {situacao === 'CONFERIDA' && (
           <p style={{ backgroundColor: '#D4EDDA', color: '#2D6A4F', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginTop: 0 }}>
-            Nota conferida: a entrada já foi efetivada no estoque e as contas a pagar foram geradas. Ela não pode mais ser editada nem excluída.
+            Nota conferida: a entrada já foi efetivada no estoque e as contas a pagar foram geradas. Ela não pode mais ser editada nem excluída, só cancelada (na lista de notas).
           </p>
         )}
         {parcelasGeradas && (
@@ -455,8 +493,8 @@ export default function NotaEntradaForm() {
         )}
         {avisoParcelas && <p style={{ ...aviso, marginTop: 0 }}>{avisoParcelas}</p>}
 
-        {/* Identificação: chave + datas */}
-        <SectionHeader label="Identificação da Nota" />
+        {/* ============================== DADOS DA NOTA ============================== */}
+        <SectionHeader label="Dados da Nota" />
         <div style={linhaChave}>
           <div>
             <label style={labelStyle}>Modelo *</label>
@@ -469,31 +507,23 @@ export default function NotaEntradaForm() {
               onChange={e => { setChave({ ...chave, serie: e.target.value }); setErroChave(''); }} disabled={chaveBloqueada} />
           </div>
           <div>
-            <label style={labelStyle}>Número *</label>
+            <label style={labelStyle}>Nº da NF *</label>
             <input type="number" min={1} step={1} style={inputStyle} placeholder="12345" value={chave.numero}
               onChange={e => { setChave({ ...chave, numero: e.target.value }); setErroChave(''); }} disabled={chaveBloqueada} />
           </div>
           <div>
+            <label style={labelStyle}>Cód.</label>
+            <input style={{ ...somenteExibicao, textAlign: 'right' }} value={fornecedor?.id ?? ''} disabled />
+          </div>
+          <div>
             <label style={labelStyle}>Fornecedor *</label>
-            <CampoBusca valor={fornecedor ? `#${fornecedor.id} — ${fornecedor.nome}` : ''} placeholder="Clique para buscar o fornecedor"
+            <CampoBusca valor={fornecedor ? fornecedor.nome : ''} placeholder="Clique para buscar o fornecedor"
               disabled={chaveBloqueada || pedido != null} onBuscar={() => setBuscandoFornecedor(true)} />
             {pedido != null && !chaveBloqueada && <p style={dica}>Vem do pedido de compra vinculado.</p>}
           </div>
           <div>
-            <label style={labelStyle}>Data de Emissão *</label>
-            <input type="date" min={(pedido && dataPedido) || undefined} max={hoje} style={inputStyle} value={form.dataEmissao}
-              onChange={e => setCampo({ dataEmissao: e.target.value })} disabled={somenteLeitura || parcelasGeradas} />
-            {erroEmissao
-              ? <p style={dicaErro}>{erroEmissao}</p>
-              : pedido && dataPedido && !somenteLeitura && <p style={dica}>A partir de {dataBR(dataPedido)} (data do pedido).</p>}
-          </div>
-          <div>
-            <label style={labelStyle}>Data de Chegada</label>
-            <input type="date" min={form.dataEmissao || undefined} max={hoje} style={inputStyle} value={form.dataChegada}
-              onChange={e => setCampo({ dataChegada: e.target.value })} disabled={somenteLeitura || parcelasGeradas} />
-            {erroChegada
-              ? <p style={dicaErro}>{erroChegada}</p>
-              : !somenteLeitura && <p style={dica}>Vazia = data da confirmação.</p>}
+            <label style={labelStyle}>CPF/CNPJ</label>
+            <input style={somenteExibicao} value={fornecedor?.cpfCnpj || (fornecedor ? '—' : '')} disabled />
           </div>
         </div>
         {erroChave && <p style={erroBanner}>{erroChave}</p>}
@@ -524,6 +554,25 @@ export default function NotaEntradaForm() {
           </div>
         )}
 
+        <div style={linhaDatas}>
+          <div>
+            <label style={labelStyle}>Emissão *</label>
+            <input type="date" min={(pedido && dataPedido) || undefined} max={hoje} style={inputStyle} value={form.dataEmissao}
+              onChange={e => setCampo({ dataEmissao: e.target.value })} disabled={somenteLeitura || parcelasGeradas} />
+            {erroEmissao
+              ? <p style={dicaErro}>{erroEmissao}</p>
+              : pedido && dataPedido && !somenteLeitura && <p style={dica}>A partir de {dataBR(dataPedido)} (data do pedido).</p>}
+          </div>
+          <div>
+            <label style={labelStyle}>Entrada</label>
+            <input type="date" min={form.dataEmissao || undefined} max={hoje} style={inputStyle} value={form.dataChegada}
+              onChange={e => setCampo({ dataChegada: e.target.value })} disabled={somenteLeitura || parcelasGeradas} />
+            {erroChegada
+              ? <p style={dicaErro}>{erroChegada}</p>
+              : !somenteLeitura && <p style={dica}>Vazia = data da confirmação.</p>}
+          </div>
+        </div>
+
         {/* Pedido de compra */}
         {(pedido != null || OFERECER_PEDIDO_COMPRA) && <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {!somenteLeitura && !parcelasGeradas && (
@@ -548,46 +597,9 @@ export default function NotaEntradaForm() {
         </div>}
         {avisoPedido && <p style={{ ...aviso, marginBottom: 0 }}>{avisoPedido}</p>}
 
-        {/* Dados da nota */}
-        <SectionHeader label="Dados da Nota" />
-        <div style={g12}>
-          <div style={{ gridColumn: 'span 2' }}>
-            <label style={labelStyle}>Tipo de Frete</label>
-            <select style={sel} value={form.tipoFrete} onChange={e => setCampo({ tipoFrete: e.target.value as '' | 'CIF' | 'FOB' })} disabled={!formLiberado}>
-              <option value="">Selecione</option>
-              <option value="CIF">CIF</option>
-              <option value="FOB">FOB</option>
-            </select>
-          </div>
-          <div style={{ gridColumn: 'span 3' }}>
-            <label style={labelStyle}>Condição de Pagamento</label>
-            <select style={sel} value={form.condicaoPagamentoId}
-              onChange={e => setCampo({ condicaoPagamentoId: e.target.value ? Number(e.target.value) : '' })} disabled={!formLiberado}>
-              <option value="">Selecione (à vista)</option>
-              {condicoes.filter(c => c.ativo !== false || c.id === form.condicaoPagamentoId)
-                .map(c => <option key={c.id} value={c.id}>{c.condicao}</option>)}
-            </select>
-            {origemCondicao != null && form.condicaoPagamentoId === origemCondicao.id && !somenteLeitura && (
-              <p style={dica}>Preenchida a partir do {origemCondicao.de}. Pode ser alterada.</p>
-            )}
-          </div>
-          <div style={{ gridColumn: 'span 5' }}>
-            <label style={labelStyle}>Transportadora</label>
-            <CampoBusca valor={transportadora ? `#${transportadora.id} — ${transportadora.nome}` : ''} placeholder="Clique para buscar a transportadora"
-              disabled={!formLiberado} onBuscar={() => setBuscandoTransportadora(true)}
-              onLimpar={() => { setTransportadora(null); setErro(''); }} />
-          </div>
-          <div style={{ gridColumn: 'span 2' }}>
-            <label style={labelStyle}>Placa do Veículo</label>
-            <input style={inputStyle} placeholder="ABC1D23" maxLength={8} value={form.placaVeiculo}
-              onChange={e => setCampo({ placaVeiculo: e.target.value.toUpperCase() })} disabled={!formLiberado} />
-            {erroPlaca && <p style={dicaErro}>{erroPlaca}</p>}
-          </div>
-        </div>
-
-        {/* Adicionar produto */}
+        {/* ================================ PRODUTOS ================================= */}
+        <SectionHeader label="Produtos" />
         {!somenteLeitura && (<>
-          <SectionHeader label="Adicionar Produto" />
           <PainelProduto
             item={lista.novoItem} produtos={produtos} classificacoes={classificacoes}
             classificacaoTravada={classifTravadaNoPainel} desabilitado={!formLiberado}
@@ -597,8 +609,6 @@ export default function NotaEntradaForm() {
           />
         </>)}
 
-        {/* Lista de produtos */}
-        <SectionHeader label="Produtos da Nota" />
         <TabelaItens
           itens={lista.itens} produtos={produtos} classificacoes={classificacoes}
           editavel={formLiberado} removivel={formLiberado || parcelasGeradas}
@@ -616,25 +626,99 @@ export default function NotaEntradaForm() {
           <p style={{ ...dica, marginBottom: 12 }}>Rateio = frete + seguro + outras despesas divididos pelo valor de cada item. É uma prévia; ao salvar, o sistema recalcula tudo.</p>
         )}
 
-        {/* Custos e totais */}
-        <SectionHeader label="Custos e Totais" />
-        <BlocoTotais itens={lista.itens} despesas={despesas} desabilitado={!formLiberado} rotuloTotal="Valor Total da Nota"
-          onMudar={changes => { setDespesas(prev => ({ ...prev, ...changes })); setErro(''); }} />
-
-        {/* Parcelas */}
-        <SectionHeader label={somenteLeitura ? 'Contas a Pagar desta nota' : 'Parcelas'} />
-        {!somenteLeitura && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-            <button type="button" onClick={gerarParcelas} disabled={!formLiberado || gerandoParcelas}
-              style={{ ...btnPrimary, padding: '8px 20px', opacity: !formLiberado || gerandoParcelas ? 0.6 : 1, cursor: formLiberado ? 'pointer' : 'not-allowed' }}>
-              {gerandoParcelas ? 'Gerando...' : parcelasGeradas ? '✓ Parcelas geradas' : 'Gerar Parcelas'}
-            </button>
-            <span style={{ fontSize: 12, color: '#8B6E63' }}>
-              {parcelasGeradas
-                ? 'A nota está bloqueada com estas parcelas. Para alterar, remova um produto da lista.'
-                : 'Calcula as parcelas pela condição de pagamento, a data de emissão e o valor total, e bloqueia a nota. As contas a pagar são criadas com estas parcelas quando a nota é confirmada.'}
-            </span>
+        {/* ========================= FRETE E TRANSPORTADORA ========================= */}
+        <SectionHeader label="Frete e Transportadora" />
+        <div style={{ ...g12, marginBottom: 8 }}>
+          <div style={{ gridColumn: 'span 6' }}>
+            <label style={labelStyle}>Transportadora</label>
+            <CampoBusca valor={transportadora ? `#${transportadora.id} — ${transportadora.nome}` : ''} placeholder="Clique para buscar a transportadora"
+              disabled={!formLiberado} onBuscar={() => setBuscandoTransportadora(true)}
+              onLimpar={() => { setTransportadora(null); setErro(''); }} />
           </div>
+          {([['Valor Frete', 'valorFrete'], ['Valor Seguro', 'valorSeguro'], ['Outras Despesas', 'outrasDespesas']] as const).map(([rotulo, campo]) => (
+            <div key={campo} style={{ gridColumn: 'span 2' }}>
+              <label style={labelStyle}>{rotulo}</label>
+              <input type="number" min={0} step={0.01} style={{ ...inputStyle, textAlign: 'right' }} placeholder="0,00"
+                value={despesas[campo]} disabled={!formLiberado}
+                onChange={e => { setDespesas(prev => ({ ...prev, [campo]: e.target.value })); setErro(''); }} />
+            </div>
+          ))}
+        </div>
+        <p style={{ ...dica, marginBottom: 8 }}>Frete, seguro e outras despesas são rateados entre os produtos, proporcionalmente ao valor de cada um, e entram no custo unitário.</p>
+
+        {/* ================================ FECHAMENTO =============================== */}
+        <SectionHeader label="Fechamento" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 16 }}>
+          {([
+            ['Total Produtos', totalProdutos],
+            ['Frete', valorDe(despesas.valorFrete)],
+            ['Seguro', valorDe(despesas.valorSeguro)],
+            ['Outras Despesas', valorDe(despesas.outrasDespesas)],
+          ] as const).map(([rotulo, valor]) => (
+            <div key={rotulo}>
+              <label style={labelStyle}>{rotulo}</label>
+              <input style={valorFechamento} value={fmt(valor)} disabled />
+            </div>
+          ))}
+          <div>
+            <label style={labelStyle}>Total da Nota</label>
+            <input style={{ ...valorFechamento, backgroundColor: '#C97B6B', color: '#FFFFFF', fontWeight: 700 }} value={fmt(totalNota)} disabled />
+          </div>
+        </div>
+        <div style={{ marginBottom: 8 }}>
+          <label style={labelStyle}>Observações da Nota</label>
+          <textarea style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }} maxLength={500}
+            placeholder="Informações adicionais..." value={form.observacoes}
+            onChange={e => setCampo({ observacoes: e.target.value })} disabled={!formLiberado} />
+        </div>
+
+        {/* =========================== CONDIÇÃO DE PAGAMENTO ========================= */}
+        <SectionHeader label={somenteLeitura ? 'Condição de Pagamento e Contas a Pagar' : 'Condição de Pagamento'} />
+        <div style={{ ...g12, alignItems: 'end', marginBottom: 8 }}>
+          <div style={{ gridColumn: 'span 5' }}>
+            <label style={labelStyle}>Condição de Pagamento</label>
+            <select style={sel} value={form.condicaoPagamentoId}
+              onChange={e => escolherCondicao(e.target.value ? Number(e.target.value) : '')} disabled={!formLiberado}>
+              <option value="">Selecione (à vista)</option>
+              {condicoes.filter(c => c.ativo !== false || c.id === form.condicaoPagamentoId)
+                .map(c => <option key={c.id} value={c.id}>{c.condicao}</option>)}
+            </select>
+          </div>
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>Forma de Pagamento</label>
+            <select style={sel} value={form.formaPagamentoId}
+              onChange={e => setCampo({ formaPagamentoId: e.target.value ? Number(e.target.value) : '' })} disabled={!formLiberado}>
+              <option value="">Selecione</option>
+              {formas.filter(f => f.ativo !== false || f.id === form.formaPagamentoId)
+                .map(f => <option key={f.id} value={f.id}>{f.formaPagamento}</option>)}
+            </select>
+          </div>
+          {!somenteLeitura && (
+            <div style={{ gridColumn: 'span 3' }}>
+              <button type="button" onClick={gerarParcelas} disabled={!podeGerarParcelas}
+                title={pendenciaParaGerar}
+                style={{ ...btnPrimary, width: '100%', padding: '11px 20px', opacity: podeGerarParcelas ? 1 : 0.6, cursor: podeGerarParcelas ? 'pointer' : 'not-allowed' }}>
+                {gerandoParcelas ? 'Gerando...' : parcelasGeradas ? '✓ Parcelas geradas' : 'Gerar parcelas'}
+              </button>
+            </div>
+          )}
+        </div>
+        {!somenteLeitura && !parcelasGeradas && pendenciaParaGerar && (
+          <p style={{ ...dicaErro, marginBottom: 12 }}>Para liberar "Gerar parcelas": {pendenciaParaGerar}</p>
+        )}
+        {!somenteLeitura && !pendenciaParaGerar && (
+          <p style={{ ...dica, marginBottom: 12 }}>
+            {[
+              origemCondicao != null && form.condicaoPagamentoId === origemCondicao.id ? `Condição preenchida a partir do ${origemCondicao.de}.` : '',
+              form.condicaoPagamentoId !== '' && form.formaPagamentoId !== '' && form.formaPagamentoId === formaDaCondicao(form.condicaoPagamentoId)
+                ? 'Forma de pagamento trazida da condição (pode ser alterada).' : '',
+              parcelasGeradas
+                ? 'A nota está bloqueada com estas parcelas. Para alterar, remova um produto da lista.'
+                : form.condicaoPagamentoId !== ''
+                  ? `Condição com ${condicoes.find(c => c.id === form.condicaoPagamentoId)?.parcelas?.length ?? 1} parcela(s). Confira o total da nota e clique em "Gerar parcelas".`
+                  : 'Sem condição: uma parcela à vista, vencendo na emissão. Confira o total da nota e clique em "Gerar parcelas".',
+            ].filter(Boolean).join(' ')}
+          </p>
         )}
         {erroParcelas && <p style={erroBanner}>{erroParcelas}</p>}
         {parcelasDesatualizadas && (
@@ -653,7 +737,7 @@ export default function NotaEntradaForm() {
                   <td style={{ padding: '8px 12px', fontSize: 13, fontWeight: 600 }}>{p.numero}/{parcelas.linhas.length}</td>
                   <td style={{ padding: '8px 12px', fontSize: 13 }}>{p.diasVencimento}</td>
                   <td style={{ padding: '8px 12px', fontSize: 13 }}>{dataBR(p.dataVencimento)}</td>
-                  <td style={{ padding: '8px 12px', fontSize: 13 }}>{p.formaPagamento || 'À vista'}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 13 }}>{formas.find(f => f.id === form.formaPagamentoId)?.formaPagamento || p.formaPagamento || 'À vista'}</td>
                   <td style={{ padding: '8px 12px', fontSize: 13 }}>{Number(p.percentual).toFixed(2)}%</td>
                   <td style={{ padding: '8px 12px', fontSize: 14, fontWeight: 600, color: '#C97B6B' }}>{fmt(p.valor)}</td>
                 </tr>
@@ -673,7 +757,7 @@ export default function NotaEntradaForm() {
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 12 }}>
               <thead>
                 <tr style={{ backgroundColor: '#FDF0E8' }}>
-                  {['Conta', 'Vencimento', 'Valor', 'Situação', 'Pago em', 'Valor pago', ''].map(h => <th key={h} style={{ ...th, padding: '8px 12px' }}>{h}</th>)}
+                  {['Conta', 'Vencimento', 'Forma', 'Valor', 'Situação', 'Pago em', 'Valor pago', ''].map(h => <th key={h} style={{ ...th, padding: '8px 12px' }}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -683,6 +767,7 @@ export default function NotaEntradaForm() {
                     <tr key={c.id} style={{ borderTop: '1px solid #F0E6DC' }}>
                       <td style={{ padding: '8px 12px', fontSize: 13 }}>{c.descricao}</td>
                       <td style={{ padding: '8px 12px', fontSize: 13 }}>{dataBR(c.dataVencimento)}</td>
+                      <td style={{ padding: '8px 12px', fontSize: 13 }}>{c.formaPagamento?.formaPagamento ?? '—'}</td>
                       <td style={{ padding: '8px 12px', fontSize: 14, fontWeight: 600, color: '#C97B6B' }}>{fmt(c.valor)}</td>
                       <td style={{ padding: '8px 12px' }}>
                         <span style={{ backgroundColor: cor[0], color: cor[1], borderRadius: 12, padding: '2px 10px', fontSize: 12, fontWeight: 600 }}>{c.situacao}</span>
@@ -711,14 +796,6 @@ export default function NotaEntradaForm() {
               </tfoot>
             </table>
           ))}
-
-        {/* Observações */}
-        <SectionHeader label="Observações" />
-        <div style={{ marginBottom: 32 }}>
-          <textarea style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }} maxLength={500}
-            placeholder="Observações sobre a nota..." value={form.observacoes}
-            onChange={e => setCampo({ observacoes: e.target.value })} disabled={!formLiberado} />
-        </div>
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           {!somenteLeitura && (<>

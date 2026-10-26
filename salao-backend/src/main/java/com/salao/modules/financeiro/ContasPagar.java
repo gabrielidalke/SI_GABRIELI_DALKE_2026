@@ -1,6 +1,7 @@
 package com.salao.modules.financeiro;
 
 import com.salao.modules.fornecedor.Fornecedor;
+import com.salao.modules.pagamento.FormaPagamento;
 import com.salao.modules.pagamento.Parcela;
 import jakarta.persistence.*;
 import lombok.*;
@@ -91,6 +92,11 @@ public class ContasPagar {
     @ManyToOne
     @JoinColumn(name = "parcela_id")
     private Parcela parcela;
+
+    // Forma com que a conta será paga (na conta da nota vem da forma escolhida na nota)
+    @ManyToOne
+    @JoinColumn(name = "forma_pagamento_id")
+    private FormaPagamento formaPagamento;
 
     // Nota de Entrada que originou a conta (chave composta; nulos quando a conta foi lançada manualmente)
     @Column(name = "nota_numero")

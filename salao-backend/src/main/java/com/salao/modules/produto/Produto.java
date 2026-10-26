@@ -58,6 +58,11 @@ public class Produto {
     @Column(name = "preco_custo", precision = 10, scale = 2)
     private BigDecimal precoCusto;
 
+    // Média ponderada do custo das entradas; recalculada a cada Nota de Entrada confirmada ou cancelada
+    @Builder.Default
+    @Column(name = "custo_medio", nullable = false, precision = 12, scale = 4)
+    private BigDecimal custoMedio = BigDecimal.ZERO;
+
     @Builder.Default
     @Column(precision = 5, scale = 2)
     private BigDecimal desconto = BigDecimal.ZERO;

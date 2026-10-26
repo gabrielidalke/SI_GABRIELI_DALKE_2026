@@ -52,6 +52,13 @@ public class NotaEntradaController {
         return service.confirmar(new NotaEntradaId(numero, serie, modelo, fornecedorId));
     }
 
+    @PostMapping("/{modelo}/{serie}/{numero}/{fornecedorId}/cancelar")
+    public NotaEntradaResponseDTO cancelar(@PathVariable Integer modelo, @PathVariable Integer serie,
+                                           @PathVariable Integer numero, @PathVariable Long fornecedorId,
+                                           @RequestBody @Valid NotaEntradaCancelamentoDTO dto) {
+        return service.cancelar(new NotaEntradaId(numero, serie, modelo, fornecedorId), dto.motivo());
+    }
+
     @DeleteMapping("/{modelo}/{serie}/{numero}/{fornecedorId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void excluir(@PathVariable Integer modelo, @PathVariable Integer serie,

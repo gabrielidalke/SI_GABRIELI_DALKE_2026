@@ -7,6 +7,7 @@ import { th, td, card, btnEdit, btnNew, pageTitle, pageSubtitle } from '../style
 const situacaoCfg: Record<SituacaoNota, { label: string; bg: string; color: string }> = {
   PENDENTE:  { label: 'Pendente',  bg: '#FFF3CD', color: '#856404' },
   CONFERIDA: { label: 'Conferida', bg: '#D4EDDA', color: '#2D6A4F' },
+  CANCELADA: { label: 'Cancelada', bg: '#F0E6DC', color: '#8B6E63' },
 };
 
 const aBtn = (bg: string, color: string): CSSProperties => ({
@@ -40,6 +41,17 @@ export default function NotasEntrada() {
     if (!confirm(texto)) return;
     try { await notaEntradaService.confirmar(n); setErro(''); carregar(); }
     catch (e) { alert(mensagemDeErro(e, 'Erro ao confirmar a nota.')); }
+  };
+
+  const cancelar = async (n: NotaEntradaResumo) => {
+    const motivo = prompt(`Cancelar a nota ${n.numero}/${n.serie} (modelo ${n.modelo})?\n\n`
+      + 'Isso estorna a entrada no estoque e cancela as contas a pagar da nota '
+      + '(não é possível se alguma conta já foi paga ou se parte do estoque já foi usada).\n\n'
+      + 'Informe o motivo do cancelamento:');
+    if (motivo === null) return;
+    if (!motivo.trim()) { alert('O motivo do cancelamento é obrigatório.'); return; }
+    try { await notaEntradaService.cancelar(n, motivo.trim()); setErro(''); carregar(); }
+    catch (e) { alert(mensagemDeErro(e, 'Erro ao cancelar a nota.')); }
   };
 
   const excluir = async (n: NotaEntradaResumo) => {
@@ -91,9 +103,12 @@ export default function NotasEntrada() {
                       <button style={{ ...btnEdit, marginRight: 4 }} onClick={() => navigate(caminhoNota(n))}>Editar</button>
                       <button style={aBtn('#D4EDDA', '#2D6A4F')} onClick={() => confirmar(n)}>Confirmar</button>
                       <button style={aBtn('#F8D7DA', '#721C24')} onClick={() => excluir(n)}>Excluir</button>
-                    </>) : (
+                    </>) : (<>
                       <button style={aBtn('#FDF0E8', '#8B6E63')} onClick={() => navigate(caminhoNota(n))}>Ver</button>
-                    )}
+                      {n.situacao === 'CONFERIDA' && (
+                        <button style={aBtn('#F8D7DA', '#721C24')} onClick={() => cancelar(n)}>Cancelar</button>
+                      )}
+                    </>)}
                   </td>
                 </tr>
               );

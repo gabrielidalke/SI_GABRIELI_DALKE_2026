@@ -11,7 +11,7 @@ const fmtData = (iso: string) => {
   } catch { return iso; }
 };
 
-const origemLabel = (tipo?: string) => tipo === 'NOTA_ENTRADA' ? 'Nota de Entrada' : tipo === 'COMPRA' ? 'Compra' : tipo === 'VENDA' ? 'Venda' : (tipo || '—');
+const origemLabel = (tipo?: string) => tipo === 'NOTA_ENTRADA' ? 'Nota de Entrada' : tipo === 'CANCELAMENTO_NOTA' ? 'Cancelamento de Nota' : tipo === 'COMPRA' ? 'Compra' : tipo === 'VENDA' ? 'Venda' : (tipo || '—');
 
 export default function EstoqueMovimentacoes() {
   const [lista, setLista] = useState<MovimentacaoEstoque[]>([]);
@@ -33,7 +33,7 @@ export default function EstoqueMovimentacoes() {
         <table className="salon-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#FDF0E8' }}>
-              {['Produto', 'Tipo', 'Quantidade', 'Saldo Anterior', 'Saldo Posterior', 'Custo Unit.', 'Documento', 'Data'].map(h => (
+              {['Produto', 'Tipo', 'Quantidade', 'Saldo Anterior', 'Saldo Posterior', 'Custo Unit.', 'Custo Médio', 'Documento', 'Data'].map(h => (
                 <th key={h} style={th}>{h}</th>
               ))}
             </tr>
@@ -55,6 +55,7 @@ export default function EstoqueMovimentacoes() {
                 <td style={td}>{m.saldoAnterior ?? '—'}</td>
                 <td style={{ ...td, fontWeight: 600 }}>{m.saldoResultante}</td>
                 <td style={td}>{m.custoUnitario != null ? `R$ ${Number(m.custoUnitario).toFixed(2)}` : '—'}</td>
+                <td style={td}>{m.custoMedioPosterior != null ? `R$ ${Number(m.custoMedioPosterior).toFixed(4)}` : '—'}</td>
                 <td style={td}>{m.documento || `${origemLabel(m.origemTipo)}${m.origemId ? ` #${m.origemId}` : ''}`}</td>
                 <td style={td}>{fmtData(m.criadoEm)}</td>
               </tr>

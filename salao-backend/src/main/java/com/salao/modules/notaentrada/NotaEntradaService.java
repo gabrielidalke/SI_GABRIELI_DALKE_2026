@@ -11,6 +11,8 @@ import com.salao.modules.fornecedor.FornecedorRepository;
 import com.salao.modules.log.LogSistemaService;
 import com.salao.modules.pagamento.CondicaoPagamento;
 import com.salao.modules.pagamento.CondicaoPagamentoRepository;
+import com.salao.modules.pagamento.FormaPagamento;
+import com.salao.modules.pagamento.FormaPagamentoRepository;
 import com.salao.modules.pagamento.GeradorParcelas;
 import com.salao.modules.pagamento.Parcela;
 import com.salao.modules.pedidocompra.PedidoCompra;
@@ -27,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -54,6 +57,7 @@ public class NotaEntradaService {
     private final TransportadoraRepository transportadoraRepository;
     private final ClassificacaoContaRepository classificacaoContaRepository;
     private final CondicaoPagamentoRepository condicaoPagamentoRepository;
+    private final FormaPagamentoRepository formaPagamentoRepository;
     private final ContasPagarRepository contasPagarRepository;
     private final MovimentacaoEstoqueService estoqueService;
     private final PedidoCompraService pedidoCompraService;
@@ -184,6 +188,54 @@ public class NotaEntradaService {
         return responder(nota);
     }
 
+    // ------------------------------------------------------------------ cancelamento
+
+    // Desfaz os efeitos da nota, tudo na mesma transação:
+    //  - CONFERIDA: estorna o estoque (e o custo médio) e cancela as contas a pagar; barra se alguma já foi paga
+    //  - PENDENTE e CONFERIDA: desfaz o recebimento no Pedido de Compra vinculado
+    @Transactional
+    public NotaEntradaResponseDTO cancelar(NotaEntradaId id, String motivo) {
+        if (motivo == null || motivo.isBlank())
+            throw new RuntimeException("O motivo do cancelamento é obrigatório.");
+
+        var nota = buscarParaAtualizar(id);
+        if ("CANCELADA".equalsIgnoreCase(nota.getSituacao()))
+            throw new RuntimeException("A nota de entrada já está cancelada.");
+
+        var itens = itensDe(id);
+
+        if ("CONFERIDA".equalsIgnoreCase(nota.getSituacao())) {
+            var contas = contasPagarRepository.findByNota(id.getNumero(), id.getSerie(), id.getModelo(), id.getFornecedorId());
+            if (contas.stream().anyMatch(c -> "PAGA".equals(c.getSituacao())))
+                throw new RuntimeException("Há contas a pagar já pagas para esta nota: não é possível cancelá-la.");
+
+            String documento = "Cancelamento da Nota " + id.getNumero() + "/" + id.getSerie() + " - Fornecedor " + id.getFornecedorId();
+            for (var item : itens) {
+                // Mesmo custo usado na entrada: custoFinal quando > 0; senão o valor unitário
+                BigDecimal custo = item.getCustoFinal().signum() > 0 ? item.getCustoFinal() : item.getValorUnitario();
+                estoqueService.estornarEntrada(item.getProduto(), item.getQuantidade(), custo, documento);
+            }
+
+            for (var conta : contas) {
+                conta.setSituacao("CANCELADA");
+                contasPagarRepository.save(conta);
+            }
+        }
+
+        var pedido = pedidoDe(nota);
+        if (pedido != null)
+            pedidoCompraService.reverterRecebimento(pedido, quantidadesPorProduto(itens));
+
+        nota.setSituacao("CANCELADA");
+        nota.setMotivoCancelamento(motivo.trim());
+        nota.setCanceladoEm(LocalDateTime.now());
+        repository.save(nota);
+
+        logService.registrar("NotaEntrada", "CANCELOU",
+                "Cancelou Nota de Entrada " + descricao(id) + ". Motivo: " + motivo.trim());
+        return responder(nota);
+    }
+
     // ------------------------------------------------------------------ exclusão
 
     @Transactional
@@ -210,8 +262,6 @@ public class NotaEntradaService {
             throw new RuntimeException("Data de emissão não pode ser posterior à data atual.");
         if (dto.dataEmissao().isBefore(DATA_MINIMA))
             throw new RuntimeException("Data de emissão inválida (anterior a 2000).");
-        if (valor(dto.valorFrete()).signum() > 0 && vazioParaNulo(dto.tipoFrete()) == null)
-            throw new RuntimeException("Informe o tipo de frete (CIF ou FOB) quando houver valor de frete.");
         if (dto.dataChegada() != null) {
             if (dto.dataChegada().isBefore(dto.dataEmissao()))
                 throw new RuntimeException("Data de chegada não pode ser anterior à data de emissão.");
@@ -235,6 +285,7 @@ public class NotaEntradaService {
         nota.setValorSeguro(valor(dto.valorSeguro()));
         nota.setOutrasDespesas(valor(dto.outrasDespesas()));
         nota.setCondicaoPagamento(resolverCondicao(dto.condicaoPagamentoId()));
+        nota.setFormaPagamento(resolverForma(dto.formaPagamentoId()));
         nota.setTransportadora(resolverTransportadora(dto.transportadoraId()));
         String placa = vazioParaNulo(dto.placaVeiculo());
         nota.setPlacaVeiculo(placa != null ? placa.toUpperCase() : null);
@@ -390,7 +441,12 @@ public class NotaEntradaService {
 
         for (var p : GeradorParcelas.calcular(condicao, nota.getValorTotal(), nota.getDataEmissao())) {
             String descricao = p.parcela() != null ? base + " - Parcela " + p.numero() + "/" + p.total() : base;
-            contasPagarRepository.save(contaDaNota(nota, descricao, p.valor(), p.dataVencimento(), p.parcela(), desconto, multa, juro));
+            // forma escolhida na nota; sem ela, a forma da parcela da condição
+            FormaPagamento forma = nota.getFormaPagamento() != null ? nota.getFormaPagamento()
+                    : p.parcela() != null ? p.parcela().getFormaPagamento() : null;
+            var conta = contaDaNota(nota, descricao, p.valor(), p.dataVencimento(), p.parcela(), desconto, multa, juro);
+            conta.setFormaPagamento(forma);
+            contasPagarRepository.save(conta);
         }
     }
 
@@ -489,6 +545,15 @@ public class NotaEntradaService {
         if (!Boolean.TRUE.equals(condicao.getAtivo()))
             throw new RuntimeException("Condição de pagamento inativa.");
         return condicao;
+    }
+
+    private FormaPagamento resolverForma(Long id) {
+        if (id == null) return null;
+        var forma = formaPagamentoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Forma de pagamento não encontrada."));
+        if (!Boolean.TRUE.equals(forma.getAtivo()))
+            throw new RuntimeException("Forma de pagamento inativa.");
+        return forma;
     }
 
     private Transportadora resolverTransportadora(Long id) {

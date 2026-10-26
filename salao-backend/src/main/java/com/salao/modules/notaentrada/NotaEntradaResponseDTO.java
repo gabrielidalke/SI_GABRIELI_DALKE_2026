@@ -22,10 +22,13 @@ public record NotaEntradaResponseDTO(
         BigDecimal valorDesconto,
         BigDecimal valorTotal,
         CondicaoInfo condicaoPagamento,
+        FormaInfo formaPagamento,
         TransportadoraInfo transportadora,
         String placaVeiculo,
         String observacoes,
         String situacao,
+        String motivoCancelamento,
+        LocalDateTime canceladoEm,
         PedidoInfo pedido,
         List<ItemInfo> itens,
         // Contas a pagar geradas na confirmação (vazio enquanto a nota está PENDENTE)
@@ -34,6 +37,7 @@ public record NotaEntradaResponseDTO(
 ) {
     public record FornecedorInfo(Long id, String nome, Boolean ativo) {}
     public record CondicaoInfo(Long id, String condicao) {}
+    public record FormaInfo(Long id, String formaPagamento) {}
     public record TransportadoraInfo(Long id, String nome, Boolean ativo) {}
     public record PedidoInfo(Integer modelo, Integer serie, Integer numero) {}
 
@@ -60,6 +64,9 @@ public record NotaEntradaResponseDTO(
         var condicao = n.getCondicaoPagamento() != null
                 ? new CondicaoInfo(n.getCondicaoPagamento().getId(), n.getCondicaoPagamento().getCondicao())
                 : null;
+        var forma = n.getFormaPagamento() != null
+                ? new FormaInfo(n.getFormaPagamento().getId(), n.getFormaPagamento().getFormaPagamento())
+                : null;
         var transportadora = n.getTransportadora() != null
                 ? new TransportadoraInfo(n.getTransportadora().getId(), n.getTransportadora().getNome(), n.getTransportadora().getAtivo())
                 : null;
@@ -78,7 +85,8 @@ public record NotaEntradaResponseDTO(
                 n.getDataEmissao(), n.getDataChegada(), n.getTipoFrete(),
                 n.getValorProdutos(), n.getValorFrete(), n.getValorSeguro(), n.getOutrasDespesas(),
                 n.getValorDesconto(), n.getValorTotal(),
-                condicao, transportadora, n.getPlacaVeiculo(), n.getObservacoes(),
-                n.getSituacao(), pedidoDe(n), itensDto, contasPagar, n.getCriadoEm());
+                condicao, forma, transportadora, n.getPlacaVeiculo(), n.getObservacoes(),
+                n.getSituacao(), n.getMotivoCancelamento(), n.getCanceladoEm(),
+                pedidoDe(n), itensDto, contasPagar, n.getCriadoEm());
     }
 }

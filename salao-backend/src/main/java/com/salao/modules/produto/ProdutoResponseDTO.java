@@ -9,6 +9,7 @@ public record ProdutoResponseDTO(
         String descricao,
         BigDecimal precoVenda,
         BigDecimal precoCusto,
+        BigDecimal custoMedio,
         BigDecimal desconto,
         Integer quantidade,
         Boolean ativo,
@@ -39,7 +40,7 @@ public record ProdutoResponseDTO(
                 : null;
         return new ProdutoResponseDTO(
                 p.getId(), p.getNome(), p.getDescricao(), p.getPrecoVenda(),
-                p.getPrecoCusto(), p.getDesconto(),
+                p.getPrecoCusto(), p.getCustoMedio(), p.getDesconto(),
                 p.getQuantidade(), p.getAtivo(), p.getCriadoEm(), p.getAtualizadoEm(),
                 ncmSh, marca, unidade, categoria
         );

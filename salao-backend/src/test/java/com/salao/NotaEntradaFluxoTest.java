@@ -226,6 +226,95 @@ class NotaEntradaFluxoTest {
         assertThat(count("contas_pagar")).isEqualTo(2);
     }
 
+    // ------------------------------------------------------------------ custo médio e cancelamento
+
+    @Test
+    void cancelarEstornaEstoqueCustoMedioEContasEExigeMotivo() throws Exception {
+        // 10 un a R$ 20 e depois 10 un a R$ 30: custo médio 25
+        enviarPost("/api/notas-entrada", nota(1001, fornA, hoje, "", item(shampoo, classMercadoria, "10", "20", "0")))
+                .andExpect(status().isCreated());
+        enviarPost(url(1001, fornA) + "/confirmar", "").andExpect(status().isOk());
+        assertThat(custoMedio(shampoo)).isEqualByComparingTo("20");
+
+        enviarPost("/api/notas-entrada", nota(1002, fornA, hoje, "", item(shampoo, classMercadoria, "10", "30", "0")))
+                .andExpect(status().isCreated());
+        enviarPost(url(1002, fornA) + "/confirmar", "").andExpect(status().isOk());
+        assertThat(qtdEstoque(shampoo)).isEqualTo(20);
+        assertThat(custoMedio(shampoo)).isEqualByComparingTo("25");
+
+        // sem motivo não cancela
+        enviarPost(url(1002, fornA) + "/cancelar", "{\"motivo\":\"  \"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value(containsString("motivo do cancelamento é obrigatório")));
+
+        // cancela a 2ª: estoque e custo médio voltam, contas da nota ficam CANCELADAS
+        enviarPost(url(1002, fornA) + "/cancelar", "{\"motivo\":\"Nota emitida com preço errado\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.situacao").value("CANCELADA"))
+                .andExpect(jsonPath("$.motivoCancelamento").value("Nota emitida com preço errado"));
+        assertThat(qtdEstoque(shampoo)).isEqualTo(10);
+        assertThat(custoMedio(shampoo)).isEqualByComparingTo("20");
+        assertThat(jdbc.queryForList("select situacao from contas_pagar where nota_numero = 1002", String.class))
+                .isNotEmpty().allMatch("CANCELADA"::equals);
+        assertThat(jdbc.queryForObject("select origem_tipo from movimentacoes_estoque order by id desc limit 1", String.class))
+                .isEqualTo("CANCELAMENTO_NOTA");
+
+        enviarPost(url(1002, fornA) + "/cancelar", "{\"motivo\":\"de novo\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("A nota de entrada já está cancelada."));
+
+        // estoque já usado: não cancela e nada muda
+        jdbc.update("update produtos set quantidade = 5 where id = ?", shampoo);
+        enviarPost(url(1001, fornA) + "/cancelar", "{\"motivo\":\"teste\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value(containsString("já foi usada")));
+        assertThat(situacao(1001, fornA)).isEqualTo("CONFERIDA");
+        assertThat(qtdEstoque(shampoo)).isEqualTo(5);
+
+        // conta já paga: não cancela
+        jdbc.update("update produtos set quantidade = 10 where id = ?", shampoo);
+        jdbc.update("update contas_pagar set situacao = 'PAGA', data_pagamento = current_date, valor_pago = valor where nota_numero = 1001");
+        enviarPost(url(1001, fornA) + "/cancelar", "{\"motivo\":\"teste\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value(containsString("já pagas")));
+        assertThat(situacao(1001, fornA)).isEqualTo("CONFERIDA");
+        assertThat(qtdEstoque(shampoo)).isEqualTo(10);
+    }
+
+    @Test
+    void formaDePagamentoDaNotaVaiParaAsContasESemElaUsaADaCondicao() throws Exception {
+        long pix = id("insert into formas_pagamento(forma_pagamento) values ('Pix') returning id");
+        String cond = ",\"condicaoPagamentoId\":" + condicao3060;
+
+        // forma trocada na nota (Pix no lugar do Boleto da condição): as duas contas saem em Pix
+        enviarPost("/api/notas-entrada", nota(1001, fornA, hoje, cond + ",\"formaPagamentoId\":" + pix,
+                item(shampoo, classMercadoria, "2", "50", "0")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.formaPagamento.formaPagamento").value("Pix"));
+        enviarPost(url(1001, fornA) + "/confirmar", "")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contasPagar[0].formaPagamento.formaPagamento").value("Pix"))
+                .andExpect(jsonPath("$.contasPagar[1].formaPagamento.formaPagamento").value("Pix"));
+
+        // sem forma na nota: cada conta usa a forma da parcela da condição
+        enviarPost("/api/notas-entrada", nota(1002, fornA, hoje, cond, item(shampoo, classMercadoria, "2", "50", "0")))
+                .andExpect(status().isCreated());
+        enviarPost(url(1002, fornA) + "/confirmar", "")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contasPagar[0].formaPagamento.formaPagamento").value("Boleto"));
+
+        // forma inativa é recusada
+        jdbc.update("update formas_pagamento set ativo = false where id = ?", pix);
+        enviarPost("/api/notas-entrada", nota(1003, fornA, hoje, cond + ",\"formaPagamentoId\":" + pix,
+                item(shampoo, classMercadoria, "1", "50", "0")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Forma de pagamento inativa."));
+    }
+
+    private BigDecimal custoMedio(long produtoId) {
+        return jdbc.queryForObject("select custo_medio from produtos where id = ?", BigDecimal.class, produtoId);
+    }
+
     @Test
     void confirmarSemCondicaoGeraUmaContaNaDataDeEmissao() throws Exception {
         enviarPost("/api/notas-entrada", nota(1001, fornA, hoje.minusDays(5), "",

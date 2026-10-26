@@ -9,6 +9,7 @@ export interface CondicaoPagamento {
   multa?: number;
   desconto?: number;
   ativo: boolean;
+  parcelas?: { numeroParcela: number; formaPagamento?: { id: number; formaPagamento: string } | null }[];
 }
 
 export interface ParcelaEmCondicao {

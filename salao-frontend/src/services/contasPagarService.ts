@@ -21,6 +21,7 @@ export interface ContaPagar {
   id: number;
   descricao: string;
   fornecedor?: { id: number; fornecedor: string };
+  formaPagamento?: { id: number; formaPagamento: string } | null;
   valor: number;
   dataVencimento: string;
   dataPagamento?: string;
