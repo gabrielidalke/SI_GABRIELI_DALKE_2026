@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -24,6 +25,14 @@ public class NcmSh {
 
     @Column(length = 200)
     private String descricao;
+
+    @Builder.Default
+    @Column(name = "aliquota_icms", nullable = false, precision = 5, scale = 2)
+    private BigDecimal aliquotaIcms = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "aliquota_ipi", nullable = false, precision = 5, scale = 2)
+    private BigDecimal aliquotaIpi = BigDecimal.ZERO;
 
     @Builder.Default
     private Boolean ativo = true;

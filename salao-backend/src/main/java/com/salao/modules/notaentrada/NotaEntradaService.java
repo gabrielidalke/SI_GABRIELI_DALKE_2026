@@ -321,12 +321,12 @@ public class NotaEntradaService {
                 throw new RuntimeException("Produto " + produto.getNome() + ": a quantidade deve ser um número inteiro (o estoque é controlado em unidades).");
             BigDecimal quantidade = dto.quantidade().setScale(3, RoundingMode.HALF_UP);
             BigDecimal valorUnitario = dto.valorUnitario().setScale(2, RoundingMode.HALF_UP);
-            BigDecimal percentual = dto.descontoPercentual() != null
-                    ? dto.descontoPercentual().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2);
             BigDecimal bruto = quantidade.multiply(valorUnitario).setScale(2, RoundingMode.HALF_UP);
             if (bruto.compareTo(LIMITE_VALOR) > 0)
                 throw new RuntimeException("Produto " + produto.getNome() + ": o valor total do item é grande demais.");
-            BigDecimal descontoValor = bruto.multiply(percentual).divide(CEM, 2, RoundingMode.HALF_UP);
+            // O desconto sai do valor unitário: total do item = quantidade x (valor unitário - desconto unitário)
+            var desconto = DescontoItem.calcular(produto.getNome(), quantidade, valorUnitario,
+                    dto.descontoPercentual(), dto.descontoUnitario());
 
             itens.add(NotaEntradaItem.builder()
                     .id(new NotaEntradaItemId(id.getNumero(), id.getSerie(), id.getModelo(), id.getFornecedorId(), produto.getId()))
@@ -335,8 +335,8 @@ public class NotaEntradaService {
                     .quantidade(quantidade)
                     .valorUnitario(valorUnitario)
                     .valorTotal(bruto)
-                    .descontoPercentual(percentual)
-                    .descontoValor(descontoValor)
+                    .descontoPercentual(desconto.percentual())
+                    .descontoValor(desconto.total())
                     .build());
         }
         return itens;

@@ -2,13 +2,22 @@ import axios from 'axios';
 
 const API = 'http://localhost:8080/api';
 
+import type { TipoPessoa } from './tipoPessoa';
+
 export interface Funcionario {
   id?: number;
+  tipoPessoa?: TipoPessoa;
   nome: string;
   apelido?: string;
   email: string;
   telefone: string;
-  cpf?: string;
+  cpfCnpj?: string;
+  rg?: string;
+  inscricaoEstadual?: string;
+  funcaoId?: number;
+  funcao?: { id: number; funcao: string; salarioBase: number };
+  cidadeId?: number;
+  cidade?: { id: number; nome: string };
   dataNascimento?: string;
   dataAdmissao: string;
   dataDemissao?: string;

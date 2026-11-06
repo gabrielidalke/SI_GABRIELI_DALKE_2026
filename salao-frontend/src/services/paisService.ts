@@ -8,6 +8,7 @@ export interface Pais {
   sigla: string;
   nacionalidade?: string;
   moeda?: string;
+  ddi?: string;
   ativo: boolean;
   dataCriacao?: string;
   dataAtualizacao?: string;
@@ -18,6 +19,7 @@ export interface PaisRequest {
   sigla: string;
   nacionalidade?: string;
   moeda?: string;
+  ddi?: string;
   ativo: boolean;
 }
 

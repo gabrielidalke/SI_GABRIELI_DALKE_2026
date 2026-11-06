@@ -36,12 +36,15 @@ interface FormState {
   categoriaId: number | null;
   precoCusto: string;
   desconto: string;
+  pesoBruto: string;
+  pesoLiquido: string;
+  quantidadeMinima: string;
 }
 
 const EMPTY: FormState = {
   nome: '', precoVenda: '', quantidade: '', ativo: true,
   ncmShId: null, marcaId: null, unidadeMedidaId: null, categoriaId: null,
-  precoCusto: '', desconto: '',
+  precoCusto: '', desconto: '', pesoBruto: '', pesoLiquido: '', quantidadeMinima: '',
 };
 
 export default function Produtos() {
@@ -98,6 +101,9 @@ export default function Produtos() {
       categoriaId: item.categoria?.id ?? item.categoriaId ?? null,
       precoCusto: item.precoCusto != null ? String(item.precoCusto) : '',
       desconto: item.desconto != null ? String(item.desconto) : '',
+      pesoBruto: item.pesoBruto ? String(item.pesoBruto) : '',
+      pesoLiquido: item.pesoLiquido ? String(item.pesoLiquido) : '',
+      quantidadeMinima: item.quantidadeMinima ? String(item.quantidadeMinima) : '',
     });
     setErro('');
     formRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -106,6 +112,7 @@ export default function Produtos() {
   const salvar = async () => {
     if (!form.nome.trim()) { setErro('Nome do produto é obrigatório.'); return; }
     if (form.precoVenda === '' || Number(form.precoVenda) <= 0) { setErro('Valor de venda é obrigatório.'); return; }
+    if (Number(form.pesoLiquido || 0) > Number(form.pesoBruto || 0)) { setErro('Peso líquido não pode ser maior que o peso bruto.'); return; }
     setErro('');
     const dto: Produto = {
       nome: form.nome,
@@ -118,6 +125,9 @@ export default function Produtos() {
       categoriaId: form.categoriaId,
       precoCusto: form.precoCusto === '' ? undefined : Number(form.precoCusto),
       desconto: form.desconto === '' ? 0 : Number(form.desconto),
+      pesoBruto: form.pesoBruto === '' ? 0 : Number(form.pesoBruto),
+      pesoLiquido: form.pesoLiquido === '' ? 0 : Number(form.pesoLiquido),
+      quantidadeMinima: form.quantidadeMinima === '' ? 0 : Number(form.quantidadeMinima),
     };
     console.log('Enviando produto:', dto);
     try {
@@ -271,6 +281,21 @@ export default function Produtos() {
               value={form.desconto}
               onChange={e => setForm({ ...form, desconto: e.target.value })}
             />
+          </div>
+          <div style={{ gridColumn: 'span 3' }}>
+            <label style={labelStyle}>Estoque Mínimo</label>
+            <input type="number" min={0} step={1} style={inputStyle} placeholder="Ex: 3" value={form.quantidadeMinima}
+              onChange={e => setForm({ ...form, quantidadeMinima: e.target.value })} />
+          </div>
+          <div style={{ gridColumn: 'span 3' }}>
+            <label style={labelStyle}>Peso Bruto (kg)</label>
+            <input type="number" min={0} step={0.001} style={inputStyle} placeholder="Ex: 0.350" value={form.pesoBruto}
+              onChange={e => setForm({ ...form, pesoBruto: e.target.value })} />
+          </div>
+          <div style={{ gridColumn: 'span 3' }}>
+            <label style={labelStyle}>Peso Líquido (kg)</label>
+            <input type="number" min={0} step={0.001} style={inputStyle} placeholder="Ex: 0.300" value={form.pesoLiquido}
+              onChange={e => setForm({ ...form, pesoLiquido: e.target.value })} />
           </div>
         </div>
 

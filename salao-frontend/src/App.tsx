@@ -6,6 +6,7 @@ import ServicoList from './pages/servico/ServicoList';
 import ServicoForm from './pages/servico/ServicoForm';
 import Produtos from './pages/Produtos';
 import Marcas from './pages/Marcas';
+import Funcoes from './pages/Funcoes';
 import UnidadesMedida from './pages/UnidadesMedida';
 import ClienteList from './pages/cliente/ClienteList';
 import ClienteForm from './pages/cliente/ClienteForm';
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/clientes/novo" element={<ClienteForm />} />
             <Route path="/clientes/editar/:id" element={<ClienteForm />} />
             <Route path="/funcionarios" element={<FuncionarioList />} />
+            <Route path="/funcoes" element={<Funcoes />} />
             <Route path="/funcionarios/novo" element={<FuncionarioForm />} />
             <Route path="/funcionarios/:id" element={<FuncionarioForm />} />
             <Route path="/paises" element={<Paises />} />

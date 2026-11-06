@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { condicaoPagamentoService } from '../../services/condicaoPagamentoService';
-import type { CondicaoPagamentoRequest } from '../../services/condicaoPagamentoService';
+import type { CondicaoPagamento, CondicaoPagamentoRequest } from '../../services/condicaoPagamentoService';
 import { formaPagamentoService } from '../../services/formaPagamentoService';
 import type { FormaPagamento } from '../../services/formaPagamentoService';
 import { parcelaService } from '../../services/parcelaService';
@@ -87,8 +87,15 @@ const EMPTY: FormLocal = {
   ativo: true,
 };
 
-export default function CondicaoPagamentoForm() {
-  const { id } = useParams();
+interface Props {
+  embutido?: boolean;                        // aberta dentro de outra tela (fornecedor, cliente, nota)
+  onSalvo?: (c: CondicaoPagamento) => void;  // devolve a condição criada para já ficar selecionada
+  onCancelar?: () => void;
+}
+
+export default function CondicaoPagamentoForm({ embutido = false, onSalvo, onCancelar }: Props) {
+  const { id: idRota } = useParams();
+  const id = embutido ? undefined : idRota;
   const navigate = useNavigate();
   const [form, setForm] = useState<FormLocal>(EMPTY);
   const [parcelas, setParcelas] = useState<ParcelaLocal[]>([]);
@@ -191,7 +198,8 @@ export default function CondicaoPagamentoForm() {
       if (id) {
         await condicaoPagamentoService.atualizar(Number(id), dto);
       } else {
-        await condicaoPagamentoService.criar(dto);
+        const r = await condicaoPagamentoService.criar(dto);
+        if (embutido) { onSalvo?.(r.data); return; }
       }
 
       navigate('/condicoes-pagamento');
@@ -395,6 +403,12 @@ export default function CondicaoPagamentoForm() {
         >
           Salvar Condição
         </button>
+        {embutido && (
+          <button type="button" onClick={onCancelar}
+            style={{ marginTop: 10, background: 'none', border: '1px solid #C97B6B', color: '#C97B6B', borderRadius: 8, padding: 12, width: '100%', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+            Cancelar
+          </button>
+        )}
       </div>
     </div>
   );

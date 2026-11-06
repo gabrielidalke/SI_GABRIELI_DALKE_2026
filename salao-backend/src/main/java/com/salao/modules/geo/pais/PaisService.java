@@ -32,6 +32,7 @@ public class PaisService {
                 .sigla(sigla)
                 .nacionalidade(dto.nacionalidade())
                 .moeda(dto.moeda())
+                .ddi(vazio(dto.ddi()))
                 .ativo(dto.ativo() != null ? dto.ativo() : true)
                 .build();
         return PaisResponseDTO.from(repository.save(pais));
@@ -46,6 +47,7 @@ public class PaisService {
         pais.setSigla(sigla);
         pais.setNacionalidade(dto.nacionalidade());
         pais.setMoeda(dto.moeda());
+        pais.setDdi(vazio(dto.ddi()));
         if (dto.ativo() != null) pais.setAtivo(dto.ativo());
         return PaisResponseDTO.from(repository.save(pais));
     }
@@ -60,5 +62,9 @@ public class PaisService {
     private Pais buscarEntidade(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("País não encontrado"));
+    }
+
+    private String vazio(String texto) {
+        return texto == null || texto.isBlank() ? null : texto.trim();
     }
 }

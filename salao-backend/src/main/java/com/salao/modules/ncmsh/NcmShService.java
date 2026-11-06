@@ -1,5 +1,7 @@
 package com.salao.modules.ncmsh;
 
+import java.math.BigDecimal;
+
 import com.salao.modules.produto.ProdutoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ public class NcmShService {
         var ncm = NcmSh.builder()
                 .codigo(dto.codigo())
                 .descricao(dto.descricao())
+                .aliquotaIcms(dto.aliquotaIcms() != null ? dto.aliquotaIcms() : BigDecimal.ZERO)
+                .aliquotaIpi(dto.aliquotaIpi() != null ? dto.aliquotaIpi() : BigDecimal.ZERO)
                 .ativo(dto.ativo() != null ? dto.ativo() : true)
                 .build();
         return NcmShResponseDTO.from(repository.save(ncm));
@@ -38,6 +42,8 @@ public class NcmShService {
             throw new RuntimeException("Código NCM/SH já cadastrado");
         ncm.setCodigo(dto.codigo());
         ncm.setDescricao(dto.descricao());
+        ncm.setAliquotaIcms(dto.aliquotaIcms() != null ? dto.aliquotaIcms() : BigDecimal.ZERO);
+        ncm.setAliquotaIpi(dto.aliquotaIpi() != null ? dto.aliquotaIpi() : BigDecimal.ZERO);
         if (dto.ativo() != null) ncm.setAtivo(dto.ativo());
         return NcmShResponseDTO.from(repository.save(ncm));
     }

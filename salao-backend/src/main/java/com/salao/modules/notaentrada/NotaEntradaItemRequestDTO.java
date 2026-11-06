@@ -20,5 +20,8 @@ public record NotaEntradaItemRequestDTO(
         @PositiveOrZero(message = "Valor unitário não pode ser negativo")
         @Digits(integer = 9, fraction = 2, message = "Valor unitário inválido (máximo 2 decimais)") BigDecimal valorUnitario,
         @DecimalMin(value = "0", message = "Desconto deve estar entre 0 e 100%")
-        @DecimalMax(value = "100", message = "Desconto deve estar entre 0 e 100%") BigDecimal descontoPercentual
+        @DecimalMax(value = "100", message = "Desconto deve estar entre 0 e 100%") BigDecimal descontoPercentual,
+        // Desconto em R$ POR UNIDADE (sai do valor unitário); quando vier, manda sobre o percentual
+        @DecimalMin(value = "0", message = "Desconto não pode ser negativo")
+        @Digits(integer = 9, fraction = 2, message = "Desconto inválido (máximo 2 decimais)") BigDecimal descontoUnitario
 ) {}

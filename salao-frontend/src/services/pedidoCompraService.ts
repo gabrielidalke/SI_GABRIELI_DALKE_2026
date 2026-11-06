@@ -23,6 +23,8 @@ export interface PedidoCompraItem {
   valorBruto: number;
   descontoPercentual: number;
   descontoValor: number;
+  descontoUnitario?: number;      // o desconto sai do valor unitário
+  valorUnitarioLiquido?: number;
   valorLiquido: number;
   quantidadeRecebida: number;
 }
@@ -59,6 +61,7 @@ export interface PedidoCompraRequest extends PedidoCompraChave {
     quantidade: number;
     valorUnitario: number;
     descontoPercentual: number;
+    descontoUnitario?: number; // R$ por unidade; quando vem, manda sobre o percentual
   }[];
 }
 

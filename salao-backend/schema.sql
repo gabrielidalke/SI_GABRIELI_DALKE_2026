@@ -18,6 +18,7 @@ CREATE TABLE paises (
     sigla         VARCHAR(5),
     nacionalidade VARCHAR(100),
     moeda         VARCHAR(50),
+    ddi           VARCHAR(6),                  -- discagem internacional (+55)
     ativo         BOOLEAN       NOT NULL DEFAULT TRUE,
     criado_em     TIMESTAMP     NOT NULL DEFAULT NOW(),
     atualizado_em TIMESTAMP
@@ -37,6 +38,7 @@ CREATE TABLE cidades (
     id            BIGSERIAL     PRIMARY KEY,
     nome          VARCHAR(100)  NOT NULL,
     codigo_ibge   VARCHAR(10),
+    ddd           VARCHAR(3),                  -- discagem da região (45)
     ativo         BOOLEAN       NOT NULL DEFAULT TRUE,
     criado_em     TIMESTAMP     NOT NULL DEFAULT NOW(),
     atualizado_em TIMESTAMP,
@@ -88,6 +90,8 @@ CREATE TABLE ncm_sh (
     id            BIGSERIAL     PRIMARY KEY,
     codigo        VARCHAR(20)   NOT NULL UNIQUE,
     descricao     VARCHAR(200),
+    aliquota_icms DECIMAL(5,2)  NOT NULL DEFAULT 0 CHECK (aliquota_icms BETWEEN 0 AND 100),
+    aliquota_ipi  DECIMAL(5,2)  NOT NULL DEFAULT 0 CHECK (aliquota_ipi BETWEEN 0 AND 100),
     ativo         BOOLEAN       NOT NULL DEFAULT TRUE,
     criado_em     TIMESTAMP     NOT NULL DEFAULT NOW(),
     atualizado_em TIMESTAMP
@@ -122,16 +126,30 @@ CREATE TABLE clientes (
     complemento     VARCHAR(100),
     bairro          VARCHAR(50),
     cep             VARCHAR(9),
-    cpf             VARCHAR(14)  UNIQUE,
-    rg              VARCHAR(14),
+    tipo_pessoa     VARCHAR(8)   NOT NULL DEFAULT 'FISICA' CHECK (tipo_pessoa IN ('FISICA', 'JURIDICA')),
+    cpf_cnpj        VARCHAR(18)  UNIQUE,     -- CPF (física) ou CNPJ (jurídica), gravado formatado
+    rg              VARCHAR(14),             -- pessoa física
+    inscricao_estadual VARCHAR(20),          -- pessoa jurídica
     data_nascimento DATE,
     sexo            VARCHAR(1),
     estado_civil    VARCHAR(20),
     observacao      VARCHAR(255),
+    limite_credito  DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK (limite_credito >= 0),
     ativo           BOOLEAN      NOT NULL DEFAULT TRUE,
     criado_em       TIMESTAMP    NOT NULL DEFAULT NOW(),
     atualizado_em   TIMESTAMP,
-    cidade_id       BIGINT REFERENCES cidades(id)
+    cidade_id       BIGINT REFERENCES cidades(id),
+    condicao_pagamento_id BIGINT          -- FK criada depois de condicoes_pagamento (logo abaixo)
+);
+
+-- Função/cargo do funcionário com o salário base
+CREATE TABLE funcoes (
+    id            BIGSERIAL     PRIMARY KEY,
+    funcao        VARCHAR(60)   NOT NULL UNIQUE,
+    salario_base  DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (salario_base >= 0),
+    ativo         BOOLEAN       NOT NULL DEFAULT TRUE,
+    criado_em     TIMESTAMP     NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMP
 );
 
 CREATE TABLE funcionarios (
@@ -140,7 +158,10 @@ CREATE TABLE funcionarios (
     apelido             VARCHAR(60),
     email               VARCHAR(100) NOT NULL,
     telefone            VARCHAR(20)  NOT NULL,
-    cpf                 VARCHAR(14)  UNIQUE,
+    tipo_pessoa         VARCHAR(8)   NOT NULL DEFAULT 'FISICA' CHECK (tipo_pessoa IN ('FISICA', 'JURIDICA')),
+    cpf_cnpj            VARCHAR(18)  UNIQUE,     -- CPF (física) ou CNPJ (jurídica, ex.: MEI)
+    rg                  VARCHAR(20),
+    inscricao_estadual  VARCHAR(20),
     data_nascimento     DATE,
     data_admissao       DATE         NOT NULL,
     data_demissao       DATE,
@@ -157,7 +178,8 @@ CREATE TABLE funcionarios (
     ativo               BOOLEAN      NOT NULL DEFAULT TRUE,
     criado_em           TIMESTAMP    NOT NULL DEFAULT NOW(),
     atualizado_em       TIMESTAMP,
-    cidade_id           BIGINT REFERENCES cidades(id)
+    cidade_id           BIGINT REFERENCES cidades(id),
+    funcao_id           BIGINT REFERENCES funcoes(id)
 );
 
 -- ============================================================
@@ -185,6 +207,10 @@ CREATE TABLE condicoes_pagamento (
     atualizado_em TIMESTAMP
 );
 
+-- clientes é criada antes de condicoes_pagamento, então a chave estrangeira vem aqui
+ALTER TABLE clientes ADD CONSTRAINT fk_cliente_condicao_pagamento
+    FOREIGN KEY (condicao_pagamento_id) REFERENCES condicoes_pagamento(id);
+
 CREATE TABLE parcelas (
     id                    BIGSERIAL    PRIMARY KEY,
     numero_parcela        INT,
@@ -203,13 +229,25 @@ CREATE TABLE parcelas (
 
 CREATE TABLE fornecedores (
     id                    BIGSERIAL    PRIMARY KEY,
+    tipo_pessoa           VARCHAR(8)   NOT NULL DEFAULT 'JURIDICA' CHECK (tipo_pessoa IN ('FISICA', 'JURIDICA')),
     fornecedor            VARCHAR(150) NOT NULL,
+    nome_fantasia         VARCHAR(150),
     cpf_cnpj              VARCHAR(18)  UNIQUE,   -- gravado formatado (000.000.000-00 / 00.000.000/0000-00)
+    rg                    VARCHAR(20),           -- pessoa física
+    inscricao_estadual    VARCHAR(20),           -- pessoa jurídica
+    insc_est_subst_trib   VARCHAR(20),           -- inscrição estadual do substituto tributário (jurídica)
+    inscricao_municipal   VARCHAR(20),
     endereco              VARCHAR(200),
+    numero                VARCHAR(10),
+    complemento           VARCHAR(100),
     bairro                VARCHAR(100),
     cep                   VARCHAR(9),            -- 00000-000
     fone                  VARCHAR(15),           -- (00) 00000-0000
-    inscricao_estadual    VARCHAR(20),
+    celular               VARCHAR(15),
+    email                 VARCHAR(150),
+    contato               VARCHAR(100),
+    site                  VARCHAR(150),
+    observacao            VARCHAR(500),
     ativo                 BOOLEAN      NOT NULL DEFAULT TRUE,
     criado_em             TIMESTAMP    NOT NULL DEFAULT NOW(),
     atualizado_em         TIMESTAMP,
@@ -226,13 +264,17 @@ CREATE TABLE produtos (
     custo_medio        DECIMAL(12,4) NOT NULL DEFAULT 0 CHECK (custo_medio >= 0),  -- média ponderada das entradas
     desconto           DECIMAL(5,2)  NOT NULL DEFAULT 0,
     quantidade         INT           NOT NULL DEFAULT 0,
+    quantidade_minima  INT           NOT NULL DEFAULT 0 CHECK (quantidade_minima >= 0),  -- estoque mínimo
+    peso_bruto         DECIMAL(10,3) NOT NULL DEFAULT 0 CHECK (peso_bruto >= 0),         -- kg
+    peso_liquido       DECIMAL(10,3) NOT NULL DEFAULT 0 CHECK (peso_liquido >= 0),       -- kg
     ativo              BOOLEAN       NOT NULL DEFAULT TRUE,
     criado_em          TIMESTAMP     NOT NULL DEFAULT NOW(),
     atualizado_em      TIMESTAMP,
     marca_id           BIGINT REFERENCES marcas(id),
     unidade_medida_id  BIGINT REFERENCES unidades_medida(id),
     categoria_id       BIGINT REFERENCES categorias(id),
-    ncm_sh_id          BIGINT REFERENCES ncm_sh(id)
+    ncm_sh_id          BIGINT REFERENCES ncm_sh(id),
+    CONSTRAINT ck_produto_pesos CHECK (peso_liquido <= peso_bruto)
 );
 
 -- ============================================================
@@ -259,10 +301,19 @@ CREATE TABLE agendamento_servicos (
 
 CREATE TABLE transportadoras (
     id            BIGSERIAL    PRIMARY KEY,
+    tipo_pessoa   VARCHAR(8)   NOT NULL DEFAULT 'JURIDICA' CHECK (tipo_pessoa IN ('FISICA', 'JURIDICA')),
     nome          VARCHAR(150) NOT NULL,
+    nome_fantasia VARCHAR(150),
     cpf_cnpj      VARCHAR(18) UNIQUE,            -- gravado formatado
+    rg            VARCHAR(20),                   -- pessoa física
+    inscricao_estadual  VARCHAR(20),             -- pessoa jurídica
+    insc_est_subst_trib VARCHAR(20),             -- inscrição estadual do substituto tributário
     fone          VARCHAR(15),
+    email         VARCHAR(150),
+    site          VARCHAR(150),
     endereco      VARCHAR(200),
+    numero        VARCHAR(10),
+    complemento   VARCHAR(100),
     bairro        VARCHAR(100),
     cep           VARCHAR(9),
     ativo         BOOLEAN      NOT NULL DEFAULT TRUE,

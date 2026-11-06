@@ -29,7 +29,7 @@ export default function ClienteList() {
         <table className="salon-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#FDF0E8' }}>
-              {['ID', 'Cliente', 'Telefone', 'Email', 'CPF', 'Status'].map(h => <th key={h} style={th}>{h}</th>)}
+              {['ID', 'Cliente', 'Telefone', 'Email', 'CPF / CNPJ', 'Status'].map(h => <th key={h} style={th}>{h}</th>)}
               <th style={{ ...th, minWidth: 180 }}>Ações</th>
             </tr>
           </thead>
@@ -40,7 +40,7 @@ export default function ClienteList() {
                 <td style={{ ...td, fontWeight: 500 }}>{c.nome}</td>
                 <td style={td}>{c.telefone || '—'}</td>
                 <td style={td}>{c.email || '—'}</td>
-                <td style={td}>{c.cpf || '—'}</td>
+                <td style={td}>{c.cpfCnpj || '—'}</td>
                 <td style={td}><span style={badge(c.ativo)}>{c.ativo ? 'Ativo' : 'Inativo'}</span></td>
                 <td style={td}>
                   <button style={btnEdit} onClick={() => navigate(`/clientes/editar/${c.id}`)}>Editar</button>

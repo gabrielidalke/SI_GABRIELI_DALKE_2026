@@ -11,8 +11,9 @@ import CampoBusca from '../../components/CampoBusca';
 import { BuscarFornecedorModal } from '../../components/BuscaCadastros';
 import { PainelProduto, TabelaItens, BlocoTotais } from '../../components/ItensCompra';
 import { useItensCompra } from '../../utils/useItensCompra';
-import { calcularItem, despesasVazias, hojeISO, inteiroPositivo, valorDe, type Despesas } from '../../utils/itensCompra';
+import { calcularItem, descontoSalvo, despesasVazias, hojeISO, inteiroPositivo, valorDe, type Despesas } from '../../utils/itensCompra';
 import { inputStyle, labelStyle, card, pageTitle, pageSubtitle, erroBanner, btnPrimary, btnCancel } from '../../styles/theme';
+import CampoData from '../../components/CampoData';
 
 const sel: CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 24 };
@@ -99,7 +100,7 @@ export default function PedidoCompraForm() {
       lista.carregar(p.itens.map(i => ({
         produtoId: i.produtoId, classificacaoContaId: i.classificacaoContaId ?? '',
         quantidade: String(i.quantidade), valorUnitario: String(i.valorUnitario),
-        descontoModo: 'PERCENTUAL' as const, descontoInput: textoValor(i.descontoPercentual), persistido: false,
+        ...descontoSalvo(i.descontoUnitario, i.descontoPercentual), persistido: false,
       })));
       setCarregando(false);
     }).catch(e => { setErro(mensagemDeErro(e, 'Erro ao carregar o pedido.')); setCarregando(false); });
@@ -167,6 +168,7 @@ export default function PedidoCompraForm() {
         quantidade: Number(i.quantidade),
         valorUnitario: Number(i.valorUnitario),
         descontoPercentual: calcularItem(i).descontoPercentual,
+        descontoUnitario: calcularItem(i).descontoUnitario, // é o que vale no servidor: o desconto sai do valor unitário
       })),
     };
     setSalvando(true);
@@ -260,8 +262,8 @@ export default function PedidoCompraForm() {
         <div style={g12}>
           <div style={{ gridColumn: 'span 3' }}>
             <label style={labelStyle}>Data do Pedido *</label>
-            <input type="date" max={hoje} style={inputStyle} value={dataPedido}
-              onChange={e => { setDataPedido(e.target.value); setErro(''); }} disabled={!formLiberado} />
+            <CampoData max={hoje} value={dataPedido}
+              onChange={v => { setDataPedido(v); setErro(''); }} disabled={!formLiberado} />
             {erroData && <p style={dicaErro}>{erroData}</p>}
           </div>
           <div style={{ gridColumn: 'span 3' }}>

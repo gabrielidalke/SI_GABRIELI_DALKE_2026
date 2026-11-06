@@ -34,6 +34,9 @@ public class Pais {
     @Column(name = "moeda", length = 50)
     private String moeda;
 
+    @Column(length = 6)
+    private String ddi; // código de discagem internacional (+55)
+
     @Column(name = "ativo")
     @Builder.Default
     private Boolean ativo = true;

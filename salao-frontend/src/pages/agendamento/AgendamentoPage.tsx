@@ -6,6 +6,7 @@ import { funcionarioService, type Funcionario } from '../../services/funcionario
 import { servicoService, type Servico } from '../../services/servicoService';
 import { notaFiscalServicoService } from '../../services/notaFiscalServicoService';
 import { inputStyle, labelStyle, modalOverlay, btnPrimary, btnCancel, erroBanner } from '../../styles/theme';
+import CampoData from '../../components/CampoData';
 
 const statusCfg: Record<string, { label: string; bg: string; color: string }> = {
   AGENDADO:   { label: 'Agendado',   bg: '#D1ECF1', color: '#0C5460' },
@@ -70,6 +71,9 @@ export default function AgendamentoPage() {
     if (!form.dataHora || !form.clienteId || !form.funcionarioId || form.servicoIds.length === 0) {
       setErro('Preencha data/hora, cliente, funcionário e pelo menos um serviço.'); return;
     }
+    if (!/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(form.dataHora)) {
+      setErro('Informe a data (dd/mm/aaaa) e a hora (hh:mm, de 00:00 a 23:59) do agendamento.'); return;
+    }
     const payload = { ...form, dataHora: form.dataHora.length === 16 ? form.dataHora + ':00' : form.dataHora };
     try {
       editandoId ? await agendamentoService.atualizar(editandoId, payload) : await agendamentoService.criar(payload);
@@ -112,12 +116,7 @@ export default function AgendamentoPage() {
       {/* Filtro de data refinado */}
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, backgroundColor: 'white', borderRadius: 10, border: '1px solid #F0E6DC', padding: '10px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', marginBottom: 24 }}>
         <Calendar size={16} color="#C97B6B" />
-        <input
-          type="date"
-          value={data}
-          onChange={e => setData(e.target.value)}
-          style={{ border: 'none', outline: 'none', fontFamily: 'Lato, sans-serif', fontSize: 14, color: '#3D2B1F', cursor: 'pointer', backgroundColor: 'transparent' }}
-        />
+        <CampoData value={data} onChange={setData} style={{ width: 170 }} />
         <span style={{ fontSize: 13, color: '#8B6E63', borderLeft: '1px solid #F0E6DC', paddingLeft: 14 }}>
           {agendamentos.length} agendamento(s)
         </span>
@@ -206,7 +205,18 @@ export default function AgendamentoPage() {
             <div style={{ display: 'grid', gap: 16 }}>
               <div>
                 <label style={labelStyle}>Data e Hora *</label>
-                <input type="datetime-local" style={inputStyle} value={form.dataHora} onChange={e => setForm(p => ({ ...p, dataHora: e.target.value }))} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: 10 }}>
+                  <CampoData value={form.dataHora.slice(0, 10)}
+                    onChange={d => setForm(p => ({ ...p, dataHora: d ? `${d}T${p.dataHora.slice(11, 16) || '09:00'}` : '' }))} />
+                  <input style={inputStyle} placeholder="hh:mm" inputMode="numeric" maxLength={5}
+                    value={form.dataHora.slice(11, 16)}
+                    onChange={e => {
+                      // só números, com os dois pontos colocados sozinhos (24h: 14:30)
+                      const n = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+                      const hora = n.length > 2 ? `${n.slice(0, 2)}:${n.slice(2)}` : n;
+                      setForm(p => ({ ...p, dataHora: `${p.dataHora.slice(0, 10) || ''}T${hora}` }));
+                    }} />
+                </div>
               </div>
 
               <div>

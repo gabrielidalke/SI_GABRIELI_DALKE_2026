@@ -15,11 +15,15 @@ import BuscarPedidoModal from '../../components/BuscarPedidoModal';
 import BaixaContaModal from '../../components/BaixaContaModal';
 import { contasPagarService, type ContaPagar } from '../../services/contasPagarService';
 import CampoBusca from '../../components/CampoBusca';
+import CampoData from '../../components/CampoData';
+import CampoCondicaoPagamento from '../../components/CampoCondicaoPagamento';
+import ModalCadastro from '../../components/ModalCadastro';
+import FornecedorForm from '../fornecedor/FornecedorForm';
 import { BuscarFornecedorModal, BuscarTransportadoraModal } from '../../components/BuscaCadastros';
 import { PainelProduto, TabelaItens } from '../../components/ItensCompra';
 import { useItensCompra } from '../../utils/useItensCompra';
 import {
-  calcularItem, dataBR, despesasVazias, fmt, hojeISO, inteiroPositivo, somar, totalGeral, valorDe,
+  calcularItem, dataBR, descontoSalvo, despesasVazias, fmt, hojeISO, inteiroPositivo, somar, totalGeral, valorDe,
   type Despesas, type ItemCalculado,
 } from '../../utils/itensCompra';
 import { inputStyle, labelStyle, card, pageTitle, pageSubtitle, th, erroBanner, btnPrimary, btnCancel } from '../../styles/theme';
@@ -78,6 +82,7 @@ export default function NotaEntradaForm() {
   // popups
   const [buscandoPedido, setBuscandoPedido] = useState(false);
   const [buscandoFornecedor, setBuscandoFornecedor] = useState(false);
+  const [cadastrandoFornecedor, setCadastrandoFornecedor] = useState(false);
   const [buscandoTransportadora, setBuscandoTransportadora] = useState(false);
 
   // pedido de compra (opcional)
@@ -184,7 +189,7 @@ export default function NotaEntradaForm() {
       lista.carregar(n.itens.map(i => ({
         produtoId: i.produtoId, classificacaoContaId: i.classificacaoContaId,
         quantidade: String(i.quantidade), valorUnitario: String(i.valorUnitario),
-        descontoModo: 'PERCENTUAL' as const, descontoInput: textoValor(i.descontoPercentual), persistido: true,
+        ...descontoSalvo(i.descontoUnitario, i.descontoPercentual), persistido: true,
       })));
       setContasNota(n.contasPagar ?? []);
       setCarregando(false);
@@ -234,14 +239,18 @@ export default function NotaEntradaForm() {
   const chavePreenchida = () => inteiroPositivo(chave.modelo) && inteiroPositivo(chave.serie) && inteiroPositivo(chave.numero);
 
   // Forma de pagamento cadastrada na condição (a da 1ª parcela); a pessoa pode trocar depois
-  const formaDaCondicao = (id: number | ''): number | '' => {
-    const parcelas = condicoes.find(c => c.id === id)?.parcelas ?? [];
+  const formaDaCondicao = (id: number | '', lista: CondicaoPagamento[] = condicoes): number | '' => {
+    const parcelas = lista.find(c => c.id === id)?.parcelas ?? [];
     const primeira = [...parcelas].sort((a, b) => a.numeroParcela - b.numeroParcela)[0];
     return primeira?.formaPagamento?.id ?? '';
   };
 
-  const escolherCondicao = (id: number | '') =>
-    setCampo({ condicaoPagamentoId: id, formaPagamentoId: formaDaCondicao(id) });
+  // condição recém-cadastrada no "+ Nova" entra na lista da nota antes de sugerir a forma de pagamento
+  const escolherCondicao = (id: number | '', criada?: CondicaoPagamento) => {
+    const lista = criada ? [...condicoes, criada] : condicoes;
+    if (criada) setCondicoes(lista);
+    setCampo({ condicaoPagamentoId: id, formaPagamentoId: formaDaCondicao(id, lista) });
+  };
 
   // A condição de pagamento é sugerida (pelo fornecedor ou pelo pedido) só se a pessoa não escolheu outra
   const sugerirCondicao = (id: number | undefined, de: 'fornecedor' | 'pedido') => {
@@ -286,7 +295,7 @@ export default function NotaEntradaForm() {
       classificacaoContaId: classificacoesOriginais[i.produtoId] ?? i.classificacaoContaId ?? '',
       quantidade: String(Number((i.quantidade - i.quantidadeRecebida).toFixed(3))),
       valorUnitario: String(i.valorUnitario),
-      descontoModo: 'PERCENTUAL' as const, descontoInput: textoValor(i.descontoPercentual), persistido: false,
+      ...descontoSalvo(i.descontoUnitario, i.descontoPercentual), persistido: false,
     })));
     const semClassificacao = pendentes.filter(i => !i.classificacaoContaId && classificacoesOriginais[i.produtoId] == null).length;
     setAvisoPedido(
@@ -406,6 +415,7 @@ export default function NotaEntradaForm() {
         quantidade: Number(i.quantidade),
         valorUnitario: Number(i.valorUnitario),
         descontoPercentual: calcularItem(i).descontoPercentual,
+        descontoUnitario: calcularItem(i).descontoUnitario, // é o que vale no servidor: o desconto sai do valor unitário
       })),
     };
   };
@@ -557,16 +567,16 @@ export default function NotaEntradaForm() {
         <div style={linhaDatas}>
           <div>
             <label style={labelStyle}>Emissão *</label>
-            <input type="date" min={(pedido && dataPedido) || undefined} max={hoje} style={inputStyle} value={form.dataEmissao}
-              onChange={e => setCampo({ dataEmissao: e.target.value })} disabled={somenteLeitura || parcelasGeradas} />
+            <CampoData min={(pedido && dataPedido) || undefined} max={hoje} value={form.dataEmissao}
+              onChange={v => setCampo({ dataEmissao: v })} disabled={somenteLeitura || parcelasGeradas} />
             {erroEmissao
               ? <p style={dicaErro}>{erroEmissao}</p>
               : pedido && dataPedido && !somenteLeitura && <p style={dica}>A partir de {dataBR(dataPedido)} (data do pedido).</p>}
           </div>
           <div>
             <label style={labelStyle}>Entrada</label>
-            <input type="date" min={form.dataEmissao || undefined} max={hoje} style={inputStyle} value={form.dataChegada}
-              onChange={e => setCampo({ dataChegada: e.target.value })} disabled={somenteLeitura || parcelasGeradas} />
+            <CampoData min={form.dataEmissao || undefined} max={hoje} value={form.dataChegada}
+              onChange={v => setCampo({ dataChegada: v })} disabled={somenteLeitura || parcelasGeradas} />
             {erroChegada
               ? <p style={dicaErro}>{erroChegada}</p>
               : !somenteLeitura && <p style={dica}>Vazia = data da confirmação.</p>}
@@ -677,12 +687,9 @@ export default function NotaEntradaForm() {
         <div style={{ ...g12, alignItems: 'end', marginBottom: 8 }}>
           <div style={{ gridColumn: 'span 5' }}>
             <label style={labelStyle}>Condição de Pagamento</label>
-            <select style={sel} value={form.condicaoPagamentoId}
-              onChange={e => escolherCondicao(e.target.value ? Number(e.target.value) : '')} disabled={!formLiberado}>
-              <option value="">Selecione (à vista)</option>
-              {condicoes.filter(c => c.ativo !== false || c.id === form.condicaoPagamentoId)
-                .map(c => <option key={c.id} value={c.id}>{c.condicao}</option>)}
-            </select>
+            <CampoCondicaoPagamento value={form.condicaoPagamentoId === '' ? null : form.condicaoPagamentoId}
+              placeholder="Selecione (à vista)" disabled={!formLiberado}
+              onChange={(v, criada) => escolherCondicao(v ?? '', criada)} />
           </div>
           <div style={{ gridColumn: 'span 4' }}>
             <label style={labelStyle}>Forma de Pagamento</label>
@@ -829,7 +836,14 @@ export default function NotaEntradaForm() {
         />
       )}
       {buscandoFornecedor && (
-        <BuscarFornecedorModal onSelecionar={aoSelecionarFornecedor} onClose={() => setBuscandoFornecedor(false)} />
+        <BuscarFornecedorModal onSelecionar={aoSelecionarFornecedor} onClose={() => setBuscandoFornecedor(false)}
+          onNovo={() => { setBuscandoFornecedor(false); setCadastrandoFornecedor(true); }} />
+      )}
+      {cadastrandoFornecedor && (
+        <ModalCadastro aberto onFechar={() => setCadastrandoFornecedor(false)}>
+          <FornecedorForm embutido onCancelar={() => setCadastrandoFornecedor(false)}
+            onSalvo={f => { setCadastrandoFornecedor(false); aoSelecionarFornecedor(f); }} />
+        </ModalCadastro>
       )}
       {buscandoTransportadora && (
         <BuscarTransportadoraModal

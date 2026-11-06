@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import axios from 'axios';
 import type { CalculoBaixa } from '../services/contasPagarService';
-import { inputStyle, labelStyle, modalOverlay, modalBox, btnPrimary, btnCancel, erroBanner } from '../styles/theme';
+import { labelStyle, modalOverlay, modalBox, btnPrimary, btnCancel, erroBanner } from '../styles/theme';
+import CampoData from './CampoData';
 
 // Data local (toISOString é UTC: à noite no Brasil já seria "amanhã" e o backend recusaria como futura)
 function hoje() {
@@ -85,7 +86,7 @@ export default function BaixaContaModal({ tipo, descricao, calcular, confirmar, 
 
         <div style={{ marginBottom: 20 }}>
           <label style={labelStyle}>{pagamento ? 'Data do Pagamento *' : 'Data do Recebimento *'}</label>
-          <input type="date" style={inputStyle} value={data} max={hoje()} onChange={e => setData(e.target.value)} />
+          <CampoData value={data} max={hoje()} onChange={setData} />
         </div>
 
         {calculo && (

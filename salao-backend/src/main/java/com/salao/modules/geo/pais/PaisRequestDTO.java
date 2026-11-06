@@ -1,6 +1,7 @@
 package com.salao.modules.geo.pais;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record PaisRequestDTO(
@@ -17,6 +18,9 @@ public record PaisRequestDTO(
 
         @Size(max = 50)
         String moeda,
+        @Size(max = 6, message = "DDI deve ter no máximo 6 caracteres")
+        @Pattern(regexp = "|[+]?[0-9]{1,4}", message = "DDI inválido (ex.: +55)")
+        String ddi,
 
         Boolean ativo
 ) {}

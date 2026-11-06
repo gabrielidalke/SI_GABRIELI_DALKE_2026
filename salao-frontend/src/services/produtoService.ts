@@ -21,6 +21,9 @@ export interface Produto {
   precoCusto?: number;
   custoMedio?: number;
   desconto?: number;
+  pesoBruto?: number;        // kg
+  pesoLiquido?: number;      // kg
+  quantidadeMinima?: number; // estoque mínimo
 }
 
 export const produtoService = {

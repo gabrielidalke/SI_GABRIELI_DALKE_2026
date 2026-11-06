@@ -4,6 +4,8 @@ import axios from 'axios';
 import { contasReceberService, type ContaReceber, type ContaReceberRequest } from '../services/contasReceberService';
 import BaixaContaModal from '../components/BaixaContaModal';
 import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnDelete, btnNew, pageTitle, pageSubtitle, erroBanner } from '../styles/theme';
+import CampoData from '../components/CampoData';
+import { dataBR } from '../utils/itensCompra';
 
 const API = 'http://localhost:8080/api';
 
@@ -153,11 +155,11 @@ export default function ContasReceber() {
                       <span style={sub}>{brl(conta.valorComDesconto)} até o venc.</span>
                     )}
                   </td>
-                  <td style={td}>{conta.dataVencimento}</td>
+                  <td style={td}>{dataBR(conta.dataVencimento)}</td>
                   <td style={{ ...td, fontWeight: 600 }}>
                     {conta.situacao === 'RECEBIDA' ? (<>
                       {brl(conta.valorRecebido)}
-                      <span style={sub}>em {conta.dataRecebimento}</span>
+                      <span style={sub}>em {dataBR(conta.dataRecebimento)}</span>
                     </>) : '—'}
                   </td>
                   <td style={td}>
@@ -212,7 +214,7 @@ export default function ContasReceber() {
               </div>
               <div style={{ gridColumn: 'span 4' }}>
                 <label style={labelStyle}>Data de Vencimento *</label>
-                <input type="date" style={inputStyle} value={form.dataVencimento} onChange={e => setForm({ ...form, dataVencimento: e.target.value })} disabled={modoVer} />
+                <CampoData value={form.dataVencimento} onChange={v => setForm({ ...form, dataVencimento: v })} disabled={modoVer} />
               </div>
               <div style={{ gridColumn: 'span 4' }}>
                 <label style={labelStyle}>Cliente *</label>
@@ -245,7 +247,7 @@ export default function ContasReceber() {
 
             {modoVer && contaVer?.situacao === 'RECEBIDA' && (
               <div style={{ backgroundColor: '#FDF6F0', borderRadius: 10, padding: '14px 18px', marginBottom: 16, fontSize: 14, color: '#3D2B1F' }}>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>Recebimento em {contaVer.dataRecebimento}</div>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Recebimento em {dataBR(contaVer.dataRecebimento)}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4 }}>
                   <span>Valor da conta</span><span>{brl(contaVer.valor)}</span>
                   <span>(−) Desconto {contaVer.percentualDesconto}%</span><span>− {brl(contaVer.valorDesconto)}</span>

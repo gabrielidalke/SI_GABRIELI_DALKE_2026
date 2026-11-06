@@ -3,10 +3,11 @@ import type { CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Cliente } from '../../services/clienteService';
 import { clienteService } from '../../services/clienteService';
-import type { CondicaoPagamento } from '../../services/condicaoPagamentoService';
-import { condicaoPagamentoService } from '../../services/condicaoPagamentoService';
 import { inputStyle, labelStyle, card, pageTitle, pageSubtitle, erroBanner } from '../../styles/theme';
 import CidadeAutocomplete from '../../components/CidadeAutocomplete';
+import TipoPessoaToggle from '../../components/TipoPessoaToggle';
+import CampoCondicaoPagamento from '../../components/CampoCondicaoPagamento';
+import CampoData from '../../components/CampoData';
 
 const sel: CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 24 };
@@ -35,9 +36,8 @@ const ToggleYN = ({ value, onChange }: { value: boolean; onChange: (v: boolean) 
 export default function ClienteForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [form, setForm] = useState<Cliente>({ nome: '', ativo: true });
-  const [condicoes, setCondicoes] = useState<CondicaoPagamento[]>([]);
-  const [erro, setErro] = useState('');
+  const [form, setForm] = useState<Cliente>({ nome: '', ativo: true, tipoPessoa: 'FISICA' });
+  const [limiteCredito, setLimiteCredito] = useState(''); // texto enquanto digita (o ponto decimal não pode sumir)  const [erro, setErro] = useState('');
   const topoRef = useRef<HTMLDivElement>(null);
 
   // O formulário é longo: rola até o topo para a mensagem não ficar escondida
@@ -46,12 +46,11 @@ export default function ClienteForm() {
     topoRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    condicaoPagamentoService.listar().then(r => setCondicoes(r.data));
-    if (id) {
+  useEffect(() => {    if (id) {
       clienteService.buscar(Number(id)).then(r => {
-        const c = r.data as any;
-        setForm({ ...c, cidadeId: c.cidade?.id });
+        const c = r.data;
+        setForm({ ...c, tipoPessoa: c.tipoPessoa ?? 'FISICA', cidadeId: c.cidade?.id, condicaoPagamentoId: c.condicaoPagamento?.id });
+        setLimiteCredito(c.limiteCredito ? String(c.limiteCredito) : '');
       });
     }
   }, [id]);
@@ -63,6 +62,8 @@ export default function ClienteForm() {
     setErro('');
   };
 
+  const juridica = form.tipoPessoa === 'JURIDICA';
+
   const salvar = async () => {
     if (form.nome.trim().length < 3) { mostrarErro('Nome do cliente deve ter pelo menos 3 letras.'); return; }
     if (!form.endereco?.trim()) { mostrarErro('Endereço é obrigatório.'); return; }
@@ -72,6 +73,8 @@ export default function ClienteForm() {
     if (!(form as any).cidadeId) { mostrarErro('Cidade é obrigatória.'); return; }
     if (!form.telefone?.trim()) { mostrarErro('Telefone é obrigatório.'); return; }
     if (!form.email?.trim()) { mostrarErro('E-mail é obrigatório.'); return; }
+    if (!form.condicaoPagamentoId) { mostrarErro('Condição de pagamento é obrigatória.'); return; }
+    if (limiteCredito !== '' && !(Number(limiteCredito) >= 0)) { mostrarErro('Limite de crédito não pode ser negativo.'); return; }
     // trim() nos campos com formato fixo (telefone/CEP) evita espaço colado no início/fim reprovar a validação
     const payload = {
       ...form,
@@ -79,6 +82,7 @@ export default function ClienteForm() {
       email: form.email?.trim(),
       cep: form.cep?.trim(),
       cidadeId: (form as any).cidadeId || null,
+      limiteCredito: Number(limiteCredito) || 0,
     };
     try {
       if (id) await clienteService.atualizar(Number(id), payload as any);
@@ -107,12 +111,8 @@ export default function ClienteForm() {
             <input style={{ ...inputStyle, backgroundColor: '#F5F0ED', color: '#8B6E63' }} value={form.id ?? '(automático)'} disabled />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
-            <label style={labelStyle}>Tipo</label>
-            <select style={sel} value={(form as any).tipo || ''} onChange={e => set({ tipo: e.target.value } as any)}>
-              <option value="">Selecione</option>
-              <option value="FISICA">Física</option>
-              <option value="JURIDICA">Jurídica</option>
-            </select>
+            <label style={labelStyle}>Tipo de Pessoa *</label>
+            <TipoPessoaToggle value={form.tipoPessoa ?? 'FISICA'} onChange={v => set({ tipoPessoa: v })} />
           </div>
           <div style={{ gridColumn: 'span 4' }}>
             <label style={labelStyle}>Cliente / Nome *</label>
@@ -125,12 +125,28 @@ export default function ClienteForm() {
         </div>
 
         {/* ─── Dados Pessoais ─── */}
-        <SectionHeader label="Dados Pessoais" />
+        <SectionHeader label={juridica ? 'Dados da Empresa' : 'Dados Pessoais'} />
         <div style={g12}>
-          <div style={{ gridColumn: 'span 3' }}>
-            <label style={labelStyle}>Apelido</label>
-            <input style={inputStyle} placeholder="Apelido" value={form.apelido || ''} onChange={e => set({ apelido: e.target.value })} />
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>{juridica ? 'Nome Fantasia' : 'Apelido'}</label>
+            <input style={inputStyle} placeholder={juridica ? 'Nome fantasia' : 'Apelido'} value={form.apelido || ''} onChange={e => set({ apelido: e.target.value })} />
           </div>
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>{juridica ? 'CNPJ' : 'CPF'}</label>
+            <input style={inputStyle} placeholder={juridica ? '00.000.000/0000-00' : '000.000.000-00'} value={form.cpfCnpj || ''} onChange={e => set({ cpfCnpj: e.target.value })} />
+          </div>
+          {juridica ? (
+            <div style={{ gridColumn: 'span 4' }}>
+              <label style={labelStyle}>Inscrição Estadual</label>
+              <input style={inputStyle} placeholder="IE" value={form.inscricaoEstadual || ''} onChange={e => set({ inscricaoEstadual: e.target.value })} />
+            </div>
+          ) : (
+            <div style={{ gridColumn: 'span 4' }}>
+              <label style={labelStyle}>RG</label>
+              <input style={inputStyle} placeholder="RG" value={form.rg || ''} onChange={e => set({ rg: e.target.value })} />
+            </div>
+          )}
+          {!juridica && (<>
           <div style={{ gridColumn: 'span 3' }}>
             <label style={labelStyle}>Estado Civil</label>
             <select style={sel} value={form.estadoCivil || ''} onChange={e => set({ estadoCivil: e.target.value })}>
@@ -150,13 +166,10 @@ export default function ClienteForm() {
             </select>
           </div>
           <div style={{ gridColumn: 'span 3' }}>
-            <label style={labelStyle}>Nacionalidade</label>
-            <input style={inputStyle} placeholder="Ex: Brasileira" value={(form as any).nacionalidade || ''} onChange={e => set({ nacionalidade: e.target.value } as any)} />
-          </div>
-          <div style={{ gridColumn: 'span 4' }}>
             <label style={labelStyle}>Data Nascimento</label>
-            <input type="date" style={inputStyle} value={form.dataNascimento || ''} onChange={e => set({ dataNascimento: e.target.value })} />
+            <CampoData value={form.dataNascimento || ''} onChange={v => set({ dataNascimento: v })} />
           </div>
+          </>)}
         </div>
 
         {/* ─── Endereço ─── */}
@@ -199,20 +212,8 @@ export default function ClienteForm() {
             <input style={inputStyle} placeholder="(00) 00000-0000" value={form.telefone || ''} onChange={e => set({ telefone: e.target.value })} />
           </div>
           <div style={{ gridColumn: 'span 4' }}>
-            <label style={labelStyle}>Contato</label>
-            <input style={inputStyle} placeholder="Nome do contato..." value={(form as any).contato || ''} onChange={e => set({ contato: e.target.value } as any)} />
-          </div>
-          <div style={{ gridColumn: 'span 4' }}>
             <label style={labelStyle}>Email *</label>
             <input style={inputStyle} placeholder="email@exemplo.com" value={form.email || ''} onChange={e => set({ email: e.target.value })} />
-          </div>
-          <div style={{ gridColumn: 'span 4' }}>
-            <label style={labelStyle}>RG</label>
-            <input style={inputStyle} placeholder="RG" value={form.rg || ''} onChange={e => set({ rg: e.target.value })} />
-          </div>
-          <div style={{ gridColumn: 'span 4' }}>
-            <label style={labelStyle}>CPF</label>
-            <input style={inputStyle} placeholder="000.000.000-00" value={form.cpf || ''} onChange={e => set({ cpf: e.target.value })} />
           </div>
         </div>
 
@@ -220,15 +221,14 @@ export default function ClienteForm() {
         <SectionHeader label="Financeiro" />
         <div style={g12}>
           <div style={{ gridColumn: 'span 6' }}>
-            <label style={labelStyle}>Condição de Pagamento</label>
-            <select
-              style={sel}
-              value={(form as any).condicaoPagamentoId || ''}
-              onChange={e => set({ condicaoPagamentoId: Number(e.target.value) } as any)}
-            >
-              <option value="">Selecione</option>
-              {condicoes.map(c => <option key={c.id} value={c.id}>{c.condicao}</option>)}
-            </select>
+            <label style={labelStyle}>Condição de Pagamento *</label>
+            <CampoCondicaoPagamento value={form.condicaoPagamentoId ?? null}
+              onChange={v => set({ condicaoPagamentoId: v ?? undefined })} />
+          </div>
+          <div style={{ gridColumn: 'span 3' }}>
+            <label style={labelStyle}>Limite de Crédito (R$)</label>
+            <input type="number" min={0} step={0.01} style={inputStyle} placeholder="0,00" value={limiteCredito}
+              onChange={e => { setLimiteCredito(e.target.value); setErro(''); }} />
           </div>
         </div>
 

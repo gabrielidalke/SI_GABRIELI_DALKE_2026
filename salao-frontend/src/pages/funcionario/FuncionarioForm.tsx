@@ -5,6 +5,9 @@ import type { Funcionario } from '../../services/funcionarioService';
 import { funcionarioService } from '../../services/funcionarioService';
 import { inputStyle, labelStyle, card, btnPrimary, btnCancel, pageTitle, pageSubtitle, sectionTitle, erroBanner } from '../../styles/theme';
 import CidadeAutocomplete from '../../components/CidadeAutocomplete';
+import TipoPessoaToggle from '../../components/TipoPessoaToggle';
+import { funcaoService, type Funcao } from '../../services/funcaoService';
+import CampoData from '../../components/CampoData';
 
 const sel: CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 24 };
@@ -22,8 +25,9 @@ export default function FuncionarioForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>({
-    nome: '', email: '', telefone: '', dataAdmissao: '', ativo: true, salario: '', percentualComissao: '',
+    nome: '', email: '', telefone: '', dataAdmissao: '', ativo: true, salario: '', percentualComissao: '', tipoPessoa: 'FISICA',
   });
+  const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [erro, setErro] = useState('');
   const topoRef = useRef<HTMLDivElement>(null);
 
@@ -41,16 +45,30 @@ export default function FuncionarioForm() {
   };
 
   useEffect(() => {
+    funcaoService.listar().then(r => setFuncoes(r.data)).catch(() => { /* a lista vazia já avisa na tela */ });
+  }, []);
+
+  useEffect(() => {
     if (id) funcionarioService.buscar(Number(id)).then(r => {
       const f = r.data;
       setForm({
         ...f,
-        cidadeId: (f as any).cidade?.id,
+        tipoPessoa: f.tipoPessoa ?? 'FISICA',
+        funcaoId: f.funcao?.id,
+        cidadeId: f.cidade?.id,
         salario: f.salario != null ? String(f.salario) : '',
         percentualComissao: f.percentualComissao != null ? String(f.percentualComissao) : '',
       });
     });
   }, [id]);
+
+  const juridica = form.tipoPessoa === 'JURIDICA';
+
+  // Ao escolher a função, o salário base dela vira a sugestão de salário (se ainda não foi digitado)
+  const escolherFuncao = (funcaoId: number | undefined) => {
+    const funcao = funcoes.find(x => x.id === funcaoId);
+    set({ funcaoId, ...(funcao && form.salario === '' ? { salario: String(funcao.salarioBase) } : {}) });
+  };
 
   const salvar = async () => {
     if (!form.cep?.trim()) { mostrarErro('CEP é obrigatório.'); return; }
@@ -58,6 +76,7 @@ export default function FuncionarioForm() {
     if (!form.email.trim()) { mostrarErro('E-mail é obrigatório.'); return; }
     if (!form.nome.trim()) { mostrarErro('Nome do funcionário é obrigatório.'); return; }
     if (!form.dataAdmissao) { mostrarErro('Data de admissão é obrigatória.'); return; }
+    if (!form.funcaoId) { mostrarErro('Função é obrigatória.'); return; }
     // Data apagada no input vira '' — manda sem o campo (null no backend).
     // trim() nos campos com formato fixo (telefone/CEP) evita espaço colado no início/fim reprovar a validação
     const payload = {
@@ -142,12 +161,22 @@ export default function FuncionarioForm() {
             <input style={inputStyle} placeholder="Como é conhecido..." value={form.apelido || ''} onChange={e => set({ apelido: e.target.value })} />
           </div>
           <div style={{ gridColumn: 'span 4' }}>
-            <label style={labelStyle}>CPF</label>
-            <input style={inputStyle} placeholder="000.000.000-00" value={form.cpf || ''} onChange={e => set({ cpf: e.target.value })} />
+            <label style={labelStyle}>Tipo de Pessoa *</label>
+            <TipoPessoaToggle value={form.tipoPessoa ?? 'FISICA'} onChange={v => set({ tipoPessoa: v })} />
+          </div>
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>{juridica ? 'CNPJ (MEI)' : 'CPF'}</label>
+            <input style={inputStyle} placeholder={juridica ? '00.000.000/0000-00' : '000.000.000-00'} value={form.cpfCnpj || ''} onChange={e => set({ cpfCnpj: e.target.value })} />
+          </div>
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>{juridica ? 'Inscrição Estadual' : 'RG'}</label>
+            {juridica
+              ? <input style={inputStyle} placeholder="IE" value={form.inscricaoEstadual || ''} onChange={e => set({ inscricaoEstadual: e.target.value })} />
+              : <input style={inputStyle} placeholder="RG" value={form.rg || ''} onChange={e => set({ rg: e.target.value })} />}
           </div>
           <div style={{ gridColumn: 'span 4' }}>
             <label style={labelStyle}>Data de Nascimento</label>
-            <input type="date" style={inputStyle} value={form.dataNascimento || ''} onChange={e => set({ dataNascimento: e.target.value })} />
+            <CampoData value={form.dataNascimento || ''} onChange={v => set({ dataNascimento: v })} />
           </div>
           <div style={{ gridColumn: 'span 4' }}>
             <label style={labelStyle}>Sexo</label>
@@ -171,17 +200,27 @@ export default function FuncionarioForm() {
 
         <p style={sectionTitle}>Dados Profissionais</p>
         <div style={g12}>
+          <div style={{ gridColumn: 'span 6' }}>
+            <label style={labelStyle}>Função *</label>
+            <select style={sel} value={form.funcaoId ?? ''} onChange={e => escolherFuncao(e.target.value ? Number(e.target.value) : undefined)}>
+              <option value="">Selecione</option>
+              {funcoes.filter(x => x.ativo !== false || x.id === form.funcaoId)
+                .map(x => <option key={x.id} value={x.id}>{x.funcao} — salário base R$ {Number(x.salarioBase).toFixed(2)}</option>)}
+            </select>
+            {funcoes.length === 0 && <p style={{ fontSize: 11, color: '#8B6E63', margin: '4px 0 0' }}>Cadastre as funções no menu Funções.</p>}
+          </div>
+          <div style={{ gridColumn: 'span 6' }} />
           <div style={{ gridColumn: 'span 3' }}>
             <label style={labelStyle}>Data de Admissão *</label>
-            <input type="date" style={inputStyle} value={form.dataAdmissao} onChange={e => set({ dataAdmissao: e.target.value })} />
+            <CampoData value={form.dataAdmissao} onChange={v => set({ dataAdmissao: v })} />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
             <label style={labelStyle}>Data de Demissão</label>
-            <input type="date" style={inputStyle} value={form.dataDemissao || ''} onChange={e => set({ dataDemissao: e.target.value })} />
+            <CampoData value={form.dataDemissao || ''} min={form.dataAdmissao || undefined} onChange={v => set({ dataDemissao: v })} />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
             <label style={labelStyle}>Salário (R$)</label>
-            <input type="number" style={inputStyle} placeholder="Ex: 2000.00" value={form.salario} onChange={e => set({ salario: e.target.value })} />
+            <input type="number" style={inputStyle} placeholder="Vazio = salário base da função" value={form.salario} onChange={e => set({ salario: e.target.value })} />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
             <label style={labelStyle}>Comissão (%)</label>

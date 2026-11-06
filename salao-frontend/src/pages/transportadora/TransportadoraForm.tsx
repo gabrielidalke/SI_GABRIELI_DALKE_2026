@@ -5,6 +5,7 @@ import { transportadoraService } from '../../services/transportadoraService';
 import type { TransportadoraRequest } from '../../services/transportadoraService';
 import { inputStyle, labelStyle, card, pageTitle, pageSubtitle } from '../../styles/theme';
 import CidadeAutocomplete from '../../components/CidadeAutocomplete';
+import TipoPessoaToggle from '../../components/TipoPessoaToggle';
 
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 24 };
 
@@ -32,10 +33,19 @@ const ToggleYN = ({ value, onChange }: { value: boolean; onChange: (v: boolean) 
 );
 
 const EMPTY: TransportadoraRequest = {
+  tipoPessoa: 'JURIDICA',
   nome: '',
+  nomeFantasia: '',
   cpfCnpj: '',
+  rg: '',
+  inscricaoEstadual: '',
+  inscEstSubstTrib: '',
   fone: '',
+  email: '',
+  site: '',
   endereco: '',
+  numero: '',
+  complemento: '',
   bairro: '',
   cep: '',
   ativo: true,
@@ -59,10 +69,19 @@ export default function TransportadoraForm() {
       transportadoraService.buscar(Number(id)).then(r => {
         const t = r.data;
         setForm({
+          tipoPessoa: t.tipoPessoa ?? 'JURIDICA',
           nome: t.nome,
+          nomeFantasia: t.nomeFantasia || '',
           cpfCnpj: t.cpfCnpj || '',
+          rg: t.rg || '',
+          inscricaoEstadual: t.inscricaoEstadual || '',
+          inscEstSubstTrib: t.inscEstSubstTrib || '',
           fone: t.fone || '',
+          email: t.email || '',
+          site: t.site || '',
           endereco: t.endereco || '',
+          numero: t.numero || '',
+          complemento: t.complemento || '',
           bairro: t.bairro || '',
           cep: t.cep || '',
           ativo: t.ativo,
@@ -76,6 +95,8 @@ export default function TransportadoraForm() {
     setForm(prev => ({ ...prev, ...changes }));
     setErro('');
   };
+
+  const juridica = form.tipoPessoa === 'JURIDICA';
 
   const salvar = async () => {
     if (!form.nome.trim()) { mostrarErro('Nome da transportadora é obrigatório.'); return; }
@@ -113,7 +134,11 @@ export default function TransportadoraForm() {
               disabled
             />
           </div>
-          <div style={{ gridColumn: 'span 7' }}>
+          <div style={{ gridColumn: 'span 3' }}>
+            <label style={labelStyle}>Tipo de Pessoa *</label>
+            <TipoPessoaToggle value={form.tipoPessoa} onChange={v => set({ tipoPessoa: v })} />
+          </div>
+          <div style={{ gridColumn: 'span 4' }}>
             <label style={labelStyle}>Transportadora / Nome *</label>
             <input
               style={inputStyle}
@@ -128,16 +153,57 @@ export default function TransportadoraForm() {
           </div>
         </div>
 
-        <SectionHeader label="Documentos e Contato" />
+        <SectionHeader label="Documentos" />
         <div style={g12}>
-          <div style={{ gridColumn: 'span 4' }}>
-            <label style={labelStyle}>CPF / CNPJ</label>
+          <div style={{ gridColumn: 'span 6' }}>
+            <label style={labelStyle}>{juridica ? 'Nome Fantasia' : 'Apelido'}</label>
             <input
               style={inputStyle}
-              placeholder="000.000.000-00 ou 00.000.000/0000-00"
+              placeholder={juridica ? 'Nome fantasia...' : 'Como é conhecido...'}
+              value={form.nomeFantasia || ''}
+              onChange={e => set({ nomeFantasia: e.target.value })}
+            />
+          </div>
+          <div style={{ gridColumn: 'span 6' }} />
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>{juridica ? 'CNPJ' : 'CPF'}</label>
+            <input
+              style={inputStyle}
+              placeholder={juridica ? '00.000.000/0000-00' : '000.000.000-00'}
               value={form.cpfCnpj || ''}
               onChange={e => set({ cpfCnpj: e.target.value })}
             />
+          </div>
+          {juridica ? (<>
+            <div style={{ gridColumn: 'span 4' }}>
+              <label style={labelStyle}>Inscrição Estadual</label>
+              <input style={inputStyle} placeholder="IE" value={form.inscricaoEstadual || ''}
+                onChange={e => set({ inscricaoEstadual: e.target.value })} />
+            </div>
+            <div style={{ gridColumn: 'span 4' }}>
+              <label style={labelStyle}>IE Substituto Tributário</label>
+              <input style={inputStyle} placeholder="IE do substituto tributário" value={form.inscEstSubstTrib || ''}
+                onChange={e => set({ inscEstSubstTrib: e.target.value })} />
+            </div>
+          </>) : (
+            <div style={{ gridColumn: 'span 4' }}>
+              <label style={labelStyle}>RG</label>
+              <input style={inputStyle} placeholder="RG" value={form.rg || ''} onChange={e => set({ rg: e.target.value })} />
+            </div>
+          )}
+        </div>
+
+        <SectionHeader label="Contato" />
+        <div style={g12}>
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>E-mail</label>
+            <input style={inputStyle} placeholder="email@transportadora.com" value={form.email || ''}
+              onChange={e => set({ email: e.target.value })} />
+          </div>
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>Site</label>
+            <input style={inputStyle} placeholder="www.transportadora.com.br" value={form.site || ''}
+              onChange={e => set({ site: e.target.value })} />
           </div>
           <div style={{ gridColumn: 'span 4' }}>
             <label style={labelStyle}>Telefone</label>
@@ -160,6 +226,15 @@ export default function TransportadoraForm() {
               value={form.endereco || ''}
               onChange={e => set({ endereco: e.target.value })}
             />
+          </div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <label style={labelStyle}>Número</label>
+            <input style={inputStyle} placeholder="Nº" value={form.numero || ''} onChange={e => set({ numero: e.target.value })} />
+          </div>
+          <div style={{ gridColumn: 'span 4' }}>
+            <label style={labelStyle}>Complemento</label>
+            <input style={inputStyle} placeholder="Sala, Galpão..." value={form.complemento || ''}
+              onChange={e => set({ complemento: e.target.value })} />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
             <label style={labelStyle}>CEP</label>

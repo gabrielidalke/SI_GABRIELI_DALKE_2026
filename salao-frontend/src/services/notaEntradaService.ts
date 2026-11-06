@@ -39,6 +39,8 @@ export interface NotaEntradaItem {
   valorTotal: number;
   descontoPercentual: number;
   descontoValor: number;
+  descontoUnitario?: number;      // o desconto sai do valor unitário
+  valorUnitarioLiquido?: number;
   rateioFrete: number;
   rateioSeguro: number;
   rateioOutras: number;
@@ -79,6 +81,7 @@ export interface NotaEntradaItemRequest {
   quantidade: number;
   valorUnitario: number;
   descontoPercentual: number;
+  descontoUnitario?: number; // R$ por unidade; quando vem, manda sobre o percentual
 }
 
 export interface NotaEntradaRequest extends NotaEntradaChave {

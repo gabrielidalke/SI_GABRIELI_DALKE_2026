@@ -1,7 +1,9 @@
 package com.salao.modules.cliente;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.salao.modules.geo.cidade.Cidade;
+import com.salao.modules.pagamento.CondicaoPagamento;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -11,6 +13,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -58,11 +61,29 @@ public class Cliente {
     @Column(length = 9)
     private String cep;
 
-    @Column(length = 14, unique = true)
-    private String cpf;
+    // FISICA (CPF + RG) ou JURIDICA (CNPJ + Inscrição Estadual)
+    @Builder.Default
+    @Column(name = "tipo_pessoa", nullable = false, length = 8)
+    private String tipoPessoa = "FISICA";
+
+    @Column(name = "cpf_cnpj", length = 18, unique = true)
+    private String cpfCnpj;
 
     @Column(length = 14)
     private String rg;
+
+    @Column(name = "inscricao_estadual", length = 20)
+    private String inscricaoEstadual;
+
+    // as parcelas da condição não vão junto no JSON do cliente
+    @ManyToOne
+    @JoinColumn(name = "condicao_pagamento_id")
+    @JsonIgnoreProperties({"parcelas", "hibernateLazyInitializer", "handler"})
+    private CondicaoPagamento condicaoPagamento;
+
+    @Builder.Default
+    @Column(name = "limite_credito", nullable = false, precision = 12, scale = 2)
+    private BigDecimal limiteCredito = BigDecimal.ZERO;
 
     @Column(name = "data_nascimento")
     private LocalDate dataNascimento;

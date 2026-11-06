@@ -3,7 +3,7 @@ import type { Pais, PaisRequest } from '../services/paisService';
 import { paisService } from '../services/paisService';
 import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnDelete, badge, btnNew, pageTitle, pageSubtitle, erroBanner } from '../styles/theme';
 
-const EMPTY: PaisRequest = { nome: '', sigla: '', nacionalidade: '', moeda: '', ativo: true };
+const EMPTY: PaisRequest = { nome: '', sigla: '', nacionalidade: '', moeda: '', ddi: '', ativo: true };
 
 export default function Paises() {
   const [lista, setLista] = useState<Pais[]>([]);
@@ -17,7 +17,7 @@ export default function Paises() {
 
   const abrirNovo = () => { setForm(EMPTY); setErro(''); setModal(true); };
   const abrirEditar = (p: Pais) => {
-    setForm({ id: p.id, nome: p.nome, sigla: p.sigla, nacionalidade: p.nacionalidade || '', moeda: p.moeda || '', ativo: p.ativo });
+    setForm({ id: p.id, nome: p.nome, sigla: p.sigla, nacionalidade: p.nacionalidade || '', moeda: p.moeda || '', ddi: p.ddi || '', ativo: p.ativo });
     setErro(''); setModal(true);
   };
 
@@ -50,7 +50,7 @@ export default function Paises() {
         <table className="salon-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#FDF0E8' }}>
-              {['ID', 'País', 'Sigla', 'Nacionalidade', 'Moeda', 'Status'].map(h => <th key={h} style={th}>{h}</th>)}
+              {['ID', 'País', 'Sigla', 'DDI', 'Nacionalidade', 'Moeda', 'Status'].map(h => <th key={h} style={th}>{h}</th>)}
               <th style={{ ...th, minWidth: 180 }}>Ações</th>
             </tr>
           </thead>
@@ -60,6 +60,7 @@ export default function Paises() {
                 <td style={{ ...td, color: '#8B6E63' }}>{p.id}</td>
                 <td style={{ ...td, fontWeight: 500 }}>{p.nome}</td>
                 <td style={td}>{p.sigla}</td>
+                <td style={td}>{p.ddi || '—'}</td>
                 <td style={td}>{p.nacionalidade || '—'}</td>
                 <td style={td}>{p.moeda || '—'}</td>
                 <td style={td}><span style={badge(p.ativo)}>{p.ativo ? 'Ativo' : 'Inativo'}</span></td>
@@ -84,7 +85,7 @@ export default function Paises() {
                 <label style={labelStyle}>País *</label>
                 <input style={inputStyle} placeholder="Nome do país..." value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Sigla *</label>
                   <input style={inputStyle} placeholder="Ex: BR" maxLength={3} value={form.sigla} onChange={e => setForm({ ...form, sigla: e.target.value.toUpperCase() })} />
@@ -92,6 +93,10 @@ export default function Paises() {
                 <div>
                   <label style={labelStyle}>Moeda</label>
                   <input style={inputStyle} placeholder="Ex: Real" value={form.moeda || ''} onChange={e => setForm({ ...form, moeda: e.target.value })} />
+                </div>
+                <div>
+                  <label style={labelStyle}>DDI</label>
+                  <input style={inputStyle} placeholder="Ex: +55" maxLength={6} value={form.ddi || ''} onChange={e => setForm({ ...form, ddi: e.target.value })} />
                 </div>
               </div>
               <div>

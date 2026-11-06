@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -20,7 +21,13 @@ public record FuncionarioDTO(
         @NotBlank(message = "Telefone é obrigatório")
         @Pattern(regexp = "\\(?\\d{2}\\)?[\\s-]?\\d{4,5}-?\\d{4}", message = "Telefone inválido")
         String telefone,
-        String cpf,
+        String tipoPessoa, // FISICA ou JURIDICA (vazio = FISICA)
+        @Size(max = 18, message = "CPF/CNPJ deve ter no máximo 18 caracteres")
+        @Pattern(regexp = "[0-9./-]*", message = "CPF/CNPJ deve conter apenas números, pontos, traço e barra") String cpfCnpj,
+        @Size(max = 20, message = "RG deve ter no máximo 20 caracteres") String rg,
+        @Size(max = 20, message = "Inscrição estadual deve ter no máximo 20 caracteres") String inscricaoEstadual,
+        @NotNull(message = "Função é obrigatória") Long funcaoId,
+        Long cidadeId,
         @PastOrPresent(message = "Data de nascimento não pode ser futura")
         LocalDate dataNascimento,
         @NotNull(message = "Data de admissão é obrigatória")

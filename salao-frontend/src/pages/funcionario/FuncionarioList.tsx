@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Funcionario } from '../../services/funcionarioService';
 import { funcionarioService } from '../../services/funcionarioService';
 import { th, td, card, badge, btnNew, btnEdit, btnDelete, pageTitle, pageSubtitle } from '../../styles/theme';
+import { dataBR } from '../../utils/itensCompra';
 
 export default function FuncionarioList() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
@@ -40,7 +41,7 @@ export default function FuncionarioList() {
                 <td style={{ ...td, fontWeight: 500 }}>{f.nome}</td>
                 <td style={td}>{f.telefone}</td>
                 <td style={td}>{f.email}</td>
-                <td style={td}>{f.dataAdmissao}</td>
+                <td style={td}>{dataBR(f.dataAdmissao)}</td>
                 <td style={td}>{f.percentualComissao}%</td>
                 <td style={td}><span style={badge(f.ativo)}>{f.ativo ? 'Ativo' : 'Inativo'}</span></td>
                 <td style={td}>

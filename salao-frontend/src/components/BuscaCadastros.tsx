@@ -9,12 +9,15 @@ const carregarTransportadoras = () => transportadoraService.listar().then(r => r
 interface PopupProps<T> {
   onSelecionar: (item: T) => void;
   onClose: () => void;
+  onNovo?: () => void; // mostra o botão de cadastrar um novo sem sair da tela
 }
 
-export function BuscarFornecedorModal({ onSelecionar, onClose }: PopupProps<Fornecedor>) {
+export function BuscarFornecedorModal({ onSelecionar, onClose, onNovo }: PopupProps<Fornecedor>) {
   return (
     <ModalBusca<Fornecedor>
       titulo="Buscar Fornecedor"
+      rotuloNovo="+ Novo Fornecedor"
+      onNovo={onNovo}
       descricao="Escolha um fornecedor ativo. A condição de pagamento cadastrada nele é sugerida automaticamente."
       carregar={carregarFornecedores}
       colunas={[

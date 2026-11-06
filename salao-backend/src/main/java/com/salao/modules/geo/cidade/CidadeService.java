@@ -37,6 +37,7 @@ public class CidadeService {
             throw new RuntimeException("Essa cidade já está cadastrada para o estado selecionado");
         Cidade cidade = Cidade.builder()
                 .nome(dto.nome())
+                .ddd(dto.ddd() == null || dto.ddd().isBlank() ? null : dto.ddd().trim())
                 .ativo(dto.ativo() != null ? dto.ativo() : true)
                 .build();
         if (dto.estadoId() != null) {
@@ -52,6 +53,7 @@ public class CidadeService {
         if (dto.estadoId() != null && repository.existsByNomeIgnoreCaseAndEstadoIdAndIdNot(dto.nome(), dto.estadoId(), id))
             throw new RuntimeException("Essa cidade já está cadastrada para o estado selecionado");
         cidade.setNome(dto.nome());
+        cidade.setDdd(dto.ddd() == null || dto.ddd().isBlank() ? null : dto.ddd().trim());
         if (dto.ativo() != null) cidade.setAtivo(dto.ativo());
         if (dto.estadoId() != null) {
             estadoRepository.findById(dto.estadoId()).ifPresent(cidade::setEstado);

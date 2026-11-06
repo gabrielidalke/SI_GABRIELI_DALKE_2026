@@ -67,6 +67,19 @@ public class Produto {
     @Column(precision = 5, scale = 2)
     private BigDecimal desconto = BigDecimal.ZERO;
 
+    @Builder.Default
+    @Column(name = "peso_bruto", nullable = false, precision = 10, scale = 3)
+    private BigDecimal pesoBruto = BigDecimal.ZERO; // kg
+
+    @Builder.Default
+    @Column(name = "peso_liquido", nullable = false, precision = 10, scale = 3)
+    private BigDecimal pesoLiquido = BigDecimal.ZERO; // kg
+
+    // estoque mínimo: abaixo disso o produto precisa ser reposto
+    @Builder.Default
+    @Column(name = "quantidade_minima", nullable = false)
+    private Integer quantidadeMinima = 0;
+
     @ManyToOne
     @JoinColumn(name = "ncm_sh_id")
     private NcmSh ncmSh;

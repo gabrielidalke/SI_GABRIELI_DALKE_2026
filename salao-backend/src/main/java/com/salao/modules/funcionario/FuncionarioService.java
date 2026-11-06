@@ -1,7 +1,8 @@
 package com.salao.modules.funcionario;
 
-
-import com.salao.util.CpfCnpjValidator;
+import com.salao.modules.funcao.FuncaoService;
+import com.salao.modules.geo.cidade.CidadeRepository;
+import com.salao.util.TipoPessoa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,8 @@ import java.util.List;
 public class FuncionarioService {
 
     private final FuncionarioRepository repository;
+    private final FuncaoService funcaoService;
+    private final CidadeRepository cidadeRepository;
 
     public List<Funcionario> listar() {
         return repository.findAll();
@@ -24,46 +27,47 @@ public class FuncionarioService {
     }
 
     public Funcionario salvar(FuncionarioDTO dto) {
-        if (dto.cpf() != null && !dto.cpf().isBlank()) {
-            if (!CpfCnpjValidator.validarCPF(dto.cpf()))
-                throw new RuntimeException("CPF inválido.");
-            if (repository.existsByCpf(dto.cpf()))
-                throw new RuntimeException("CPF já cadastrado");
-        }
+        String tipo = TipoPessoa.normalizar(dto.tipoPessoa(), TipoPessoa.FISICA, dto.cpfCnpj());
+        String documento = TipoPessoa.documento(tipo, dto.cpfCnpj());
+        if (documento != null && repository.existsByCpfCnpj(documento))
+            throw new RuntimeException("CPF/CNPJ já cadastrado");
         validarDatas(dto.dataNascimento(), dto.dataAdmissao(), dto.dataDemissao());
-        return repository.save(Funcionario.builder()
-                .nome(dto.nome())
-                .apelido(dto.apelido())
-                .email(dto.email())
-                .telefone(dto.telefone())
-                .cpf(dto.cpf())
-                .dataNascimento(dto.dataNascimento())
-                .dataAdmissao(dto.dataAdmissao())
-                .sexo(dto.sexo())
-                .estadoCivil(dto.estadoCivil())
-                .endereco(dto.endereco())
-                .numero(dto.numero())
-                .complemento(dto.complemento())
-                .bairro(dto.bairro())
-                .cep(dto.cep())
-                .salario(dto.salario())
-                .percentualComissao(dto.percentualComissao() != null ? dto.percentualComissao() : BigDecimal.ZERO)
-                .observacao(dto.observacao())
-                .build());
+
+        var f = new Funcionario();
+        f.setAtivo(true);
+        preencher(f, dto, tipo, documento);
+        return repository.save(f);
     }
 
     public Funcionario atualizar(Long id, FuncionarioDTO dto) {
         Funcionario f = buscarPorId(id);
-
-        if (dto.cpf() != null && !dto.cpf().isBlank() && !CpfCnpjValidator.validarCPF(dto.cpf()))
-            throw new RuntimeException("CPF inválido.");
+        String tipo = TipoPessoa.normalizar(dto.tipoPessoa(), TipoPessoa.FISICA, dto.cpfCnpj());
+        String documento = TipoPessoa.documento(tipo, dto.cpfCnpj());
+        if (documento != null && repository.existsByCpfCnpjAndIdNot(documento, id))
+            throw new RuntimeException("CPF/CNPJ já cadastrado");
         validarDatas(dto.dataNascimento(), dto.dataAdmissao(), dto.dataDemissao());
 
+        preencher(f, dto, tipo, documento);
+        if (dto.ativo() != null) f.setAtivo(dto.ativo());
+        return repository.save(f);
+    }
+
+    public void deletar(Long id) {
+        repository.deleteById(id);
+    }
+
+    private void preencher(Funcionario f, FuncionarioDTO dto, String tipo, String documento) {
+        var funcao = funcaoService.buscarAtiva(dto.funcaoId());
+        f.setTipoPessoa(tipo);
         f.setNome(dto.nome());
         f.setApelido(dto.apelido());
         f.setEmail(dto.email());
         f.setTelefone(dto.telefone());
-        f.setCpf(dto.cpf());
+        f.setCpfCnpj(documento);
+        // RG para pessoa física; Inscrição Estadual para jurídica
+        f.setRg(TipoPessoa.soSeFisica(tipo, dto.rg()));
+        f.setInscricaoEstadual(TipoPessoa.soSeJuridica(tipo, dto.inscricaoEstadual()));
+        f.setFuncao(funcao);
         f.setDataNascimento(dto.dataNascimento());
         f.setDataAdmissao(dto.dataAdmissao());
         f.setDataDemissao(dto.dataDemissao());
@@ -74,15 +78,14 @@ public class FuncionarioService {
         f.setComplemento(dto.complemento());
         f.setBairro(dto.bairro());
         f.setCep(dto.cep());
-        f.setSalario(dto.salario());
-        f.setPercentualComissao(dto.percentualComissao());
+        // a cidade vinha da tela mas não era gravada
+        f.setCidade(dto.cidadeId() != null
+                ? cidadeRepository.findById(dto.cidadeId()).orElseThrow(() -> new RuntimeException("Cidade não encontrada"))
+                : null);
+        // sem salário informado, vale o salário base da função
+        f.setSalario(dto.salario() != null ? dto.salario() : funcao.getSalarioBase());
+        f.setPercentualComissao(dto.percentualComissao() != null ? dto.percentualComissao() : BigDecimal.ZERO);
         f.setObservacao(dto.observacao());
-        f.setAtivo(dto.ativo());
-        return repository.save(f);
-    }
-
-    public void deletar(Long id) {
-        repository.deleteById(id);
     }
 
     private void validarDatas(java.time.LocalDate nascimento, java.time.LocalDate admissao, java.time.LocalDate demissao) {

@@ -38,6 +38,35 @@ public class Transportadora {
     @Column(length = 9)
     private String cep;
 
+    // FISICA (CPF + RG) ou JURIDICA (CNPJ + Inscrição Estadual)
+    @Builder.Default
+    @Column(name = "tipo_pessoa", nullable = false, length = 8)
+    private String tipoPessoa = "JURIDICA";
+
+    @Column(name = "nome_fantasia", length = 150)
+    private String nomeFantasia;
+
+    @Column(length = 20)
+    private String rg;
+
+    @Column(name = "inscricao_estadual", length = 20)
+    private String inscricaoEstadual;
+
+    @Column(name = "insc_est_subst_trib", length = 20)
+    private String inscEstSubstTrib;
+
+    @Column(length = 10)
+    private String numero;
+
+    @Column(length = 100)
+    private String complemento;
+
+    @Column(length = 150)
+    private String email;
+
+    @Column(length = 150)
+    private String site;
+
     @Builder.Default
     private Boolean ativo = true;
 

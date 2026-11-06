@@ -14,7 +14,11 @@ public class CorsConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.addAllowedOrigin("http://localhost:5173");
+        // o front pode ser aberto por localhost, 127.0.0.1 ou [::1] (o Vite às vezes mostra um desses):
+        // aceita qualquer um deles, em qualquer porta, mas só da própria máquina
+        config.addAllowedOriginPattern("http://localhost:[*]");
+        config.addAllowedOriginPattern("http://127.0.0.1:[*]");
+        config.addAllowedOriginPattern("http://[::1]:[*]");
         config.addAllowedMethod("*");
         config.addAllowedHeader("*");
 

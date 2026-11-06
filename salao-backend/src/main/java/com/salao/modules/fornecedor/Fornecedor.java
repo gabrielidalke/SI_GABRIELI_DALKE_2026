@@ -42,6 +42,44 @@ public class Fornecedor {
     @Column(name = "inscricao_estadual", length = 20)
     private String inscricaoEstadual;
 
+    // FISICA (CPF + RG) ou JURIDICA (CNPJ + Inscrição Estadual)
+    @Builder.Default
+    @Column(name = "tipo_pessoa", nullable = false, length = 8)
+    private String tipoPessoa = "JURIDICA";
+
+    @Column(name = "nome_fantasia", length = 150)
+    private String nomeFantasia;
+
+    @Column(length = 20)
+    private String rg;
+
+    @Column(name = "insc_est_subst_trib", length = 20)
+    private String inscEstSubstTrib;
+
+    @Column(name = "inscricao_municipal", length = 20)
+    private String inscricaoMunicipal;
+
+    @Column(length = 10)
+    private String numero;
+
+    @Column(length = 100)
+    private String complemento;
+
+    @Column(length = 15)
+    private String celular;
+
+    @Column(length = 150)
+    private String email;
+
+    @Column(length = 100)
+    private String contato;
+
+    @Column(length = 150)
+    private String site;
+
+    @Column(length = 500)
+    private String observacao;
+
     @Builder.Default
     private Boolean ativo = true;
 

@@ -28,6 +28,9 @@ public class Cidade {
     @Column(name = "codigo_ibge", length = 10)
     private String codigoIbge;
 
+    @Column(length = 3)
+    private String ddd; // código de discagem da região (45)
+
     @ManyToOne
     @JoinColumn(name = "estado_id")
     private Estado estado;

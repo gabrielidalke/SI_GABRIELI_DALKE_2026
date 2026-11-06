@@ -46,6 +46,7 @@ public record NotaEntradaResponseDTO(
             Long classificacaoContaId, String classificacaoNome,
             BigDecimal quantidade, BigDecimal valorUnitario, BigDecimal valorTotal,
             BigDecimal descontoPercentual, BigDecimal descontoValor,
+            BigDecimal descontoUnitario, BigDecimal valorUnitarioLiquido, // o desconto sai do valor unitário
             BigDecimal rateioFrete, BigDecimal rateioSeguro, BigDecimal rateioOutras,
             BigDecimal custoFinal
     ) {}
@@ -78,6 +79,8 @@ public record NotaEntradaResponseDTO(
                 i.getClassificacaoConta().getId(), i.getClassificacaoConta().getNome(),
                 i.getQuantidade(), i.getValorUnitario(), i.getValorTotal(),
                 i.getDescontoPercentual(), i.getDescontoValor(),
+                DescontoItem.unitarioDe(i.getDescontoValor(), i.getQuantidade()),
+                i.getValorUnitario().subtract(DescontoItem.unitarioDe(i.getDescontoValor(), i.getQuantidade())),
                 i.getRateioFrete(), i.getRateioSeguro(), i.getRateioOutras(),
                 i.getCustoFinal())).toList();
         return new NotaEntradaResponseDTO(

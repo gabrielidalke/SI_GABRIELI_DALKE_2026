@@ -79,10 +79,14 @@ export function PainelProduto({
             onChange={e => onMudar({ descontoModo: 'PERCENTUAL', descontoInput: e.target.value })} />
         </div>
         <div style={{ gridColumn: 'span 2' }}>
-          <label style={labelStyle}>Desconto (R$)</label>
+          <label style={labelStyle}>Desc. Unit. (R$)</label>
           <input type="number" min={0} step={0.01} style={inputStyle} disabled={desabilitado}
-            value={emPercentual ? calculado(c.descontoValor, item.descontoInput) : item.descontoInput}
+            value={emPercentual ? calculado(c.descontoUnitario, item.descontoInput) : item.descontoInput}
             onChange={e => onMudar({ descontoModo: 'VALOR', descontoInput: e.target.value })} />
+        </div>
+        <div style={{ gridColumn: 'span 2' }}>
+          <label style={labelStyle}>Vlr. Unit. c/ Desc.</label>
+          <input style={somenteExibicao} value={fmt(c.valorUnitarioLiquido)} disabled />
         </div>
         <div style={{ gridColumn: 'span 2' }}>
           <label style={labelStyle}>Valor Bruto</label>
@@ -92,7 +96,10 @@ export function PainelProduto({
           <label style={labelStyle}>Valor c/ Desconto</label>
           <input style={{ ...somenteExibicao, color: '#C97B6B', fontWeight: 700 }} value={fmt(c.liquido)} disabled />
         </div>
-        <div style={{ gridColumn: 'span 4', display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+        <p style={{ gridColumn: '1 / span 10', ...dica, marginTop: -8 }}>
+          O desconto sai do valor unitário: em % ou em R$ por unidade. Valor c/ Desconto = Qtd. x Vlr. Unit. c/ Desc.
+        </p>
+        <div style={{ gridColumn: '11 / span 2', gridRow: 2, display: 'flex', alignItems: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" onClick={onAdicionar} disabled={desabilitado}
             style={{ backgroundColor: 'transparent', border: '1px dashed #C97B6B', color: '#C97B6B', borderRadius: 6, padding: '10px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600, flex: 1 }}>
             {editando ? '✓ Atualizar Produto' : '+ Adicionar Produto'}
@@ -141,7 +148,7 @@ export function BlocoTotais({ itens, despesas, desabilitado, rotuloTotal, onMuda
   return (
     <div style={{ ...g12, marginBottom: 24 }}>
       {leitura('Produtos Bruto', t.bruto)}
-      {leitura('Total Desconto (itens)', t.desconto)}
+      {leitura('Descontos (já abatidos)', t.desconto)}
       {leitura('Produtos Líquido', t.liquido)}
       {campo('Frete (R$)', 'valorFrete')}
       {campo('Seguro (R$)', 'valorSeguro')}
@@ -186,8 +193,10 @@ export function TabelaItens({
   const calculados = itens.map(calcularItem);
   const total = somar(calculados);
   const comAcoes = editavel || removivel;
-  const colunas = 9 + extras.length + (comAcoes ? 1 : 0);
-  const cabecalho = ['Produto', 'Classificação', 'UND', 'Qtd.', 'Valor Unit.', 'Desc. %', 'Desc. R$', 'Valor Bruto', 'Valor c/ Desc.', ...extras.map(e => e.titulo)];
+  const colunas = 10 + extras.length + (comAcoes ? 1 : 0);
+  // o desconto sai do valor unitário: a grade mostra o desconto por unidade e o valor unitário já líquido
+  const cabecalho = ['Produto', 'Classificação', 'UND', 'Qtd.', 'Valor Unit.', 'Desc. %', 'Desc. Unit.', 'Vlr. Unit. c/ Desc.',
+    'Desc. Total', 'Valor c/ Desc.', ...extras.map(e => e.titulo)];
 
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -219,8 +228,9 @@ export function TabelaItens({
                 <td style={celula}>{item.quantidade}</td>
                 <td style={celula}>{fmt(Number(item.valorUnitario))}</td>
                 <td style={celula}>{c.descontoPercentual.toFixed(2)}%</td>
-                <td style={celula}>{fmt(c.descontoValor)}</td>
-                <td style={celula}>{fmt(c.bruto)}</td>
+                <td style={celula}>{fmt(c.descontoUnitario)}</td>
+                <td style={{ ...celula, fontWeight: 600 }}>{fmt(c.valorUnitarioLiquido)}</td>
+                <td style={celula} title={`Qtd. ${item.quantidade} x ${fmt(c.descontoUnitario)}`}>{fmt(c.descontoValor)}</td>
                 <td style={{ ...celula, fontSize: 14, fontWeight: 600, color: '#C97B6B' }}>{fmt(c.liquido)}</td>
                 {extras.map(e => <td key={e.titulo} style={celula}>{e.render(c)}</td>)}
                 {comAcoes && (
@@ -245,9 +255,8 @@ export function TabelaItens({
             <tr style={{ borderTop: '2px solid #E8D5CC', backgroundColor: '#FDF0E8' }}>
               <td style={{ ...celula, fontWeight: 700 }} colSpan={3}>Totais</td>
               <td style={{ ...celula, fontWeight: 700 }}>{total.quantidade}</td>
-              <td colSpan={2} />
+              <td colSpan={4} />
               <td style={{ ...celula, fontWeight: 700 }}>{fmt(total.desconto)}</td>
-              <td style={{ ...celula, fontWeight: 700 }}>{fmt(total.bruto)}</td>
               <td style={{ ...celula, fontWeight: 700, fontSize: 14, color: '#C97B6B' }}>{fmt(total.liquido)}</td>
               {extras.map(e => <td key={e.titulo} style={{ ...celula, fontWeight: 700 }}>{e.total}</td>)}
               {comAcoes && <td />}

@@ -5,7 +5,7 @@ import type { Estado } from '../services/estadoService';
 import { estadoService } from '../services/estadoService';
 import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnDelete, badge, btnNew, pageTitle, pageSubtitle, erroBanner } from '../styles/theme';
 
-const EMPTY: CidadeRequest = { nome: '', estadoId: undefined, ativo: true };
+const EMPTY: CidadeRequest = { nome: '', estadoId: undefined, ddd: '', ativo: true };
 
 export default function Cidades() {
   const [lista, setLista] = useState<Cidade[]>([]);
@@ -20,7 +20,7 @@ export default function Cidades() {
 
   const abrirNovo = () => { setForm(EMPTY); setErro(''); setModal(true); };
   const abrirEditar = (c: Cidade) => {
-    setForm({ id: c.id, nome: c.nome, estadoId: c.estadoId, ativo: c.ativo });
+    setForm({ id: c.id, nome: c.nome, estadoId: c.estadoId, ddd: c.ddd || '', ativo: c.ativo });
     setErro(''); setModal(true);
   };
 
@@ -53,7 +53,7 @@ export default function Cidades() {
         <table className="salon-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#FDF0E8' }}>
-              {['ID', 'Cidade', 'Estado', 'UF', 'Status'].map(h => <th key={h} style={th}>{h}</th>)}
+              {['ID', 'Cidade', 'Estado', 'UF', 'DDD', 'Status'].map(h => <th key={h} style={th}>{h}</th>)}
               <th style={{ ...th, minWidth: 180 }}>Ações</th>
             </tr>
           </thead>
@@ -64,6 +64,7 @@ export default function Cidades() {
                 <td style={{ ...td, fontWeight: 500 }}>{c.nome}</td>
                 <td style={td}>{c.estadoNome || '—'}</td>
                 <td style={td}>{c.estadoUf || '—'}</td>
+                <td style={td}>{c.ddd || '—'}</td>
                 <td style={td}><span style={badge(c.ativo)}>{c.ativo ? 'Ativo' : 'Inativo'}</span></td>
                 <td style={td}>
                   <button style={btnEdit} onClick={() => abrirEditar(c)}>Editar</button>
@@ -92,6 +93,10 @@ export default function Cidades() {
                   <option value="">Selecione</option>
                   {estados.map(e => <option key={e.id} value={e.id}>{e.nome} ({e.uf})</option>)}
                 </select>
+              </div>
+              <div>
+                <label style={labelStyle}>DDD</label>
+                <input style={inputStyle} placeholder="Ex: 45" maxLength={3} value={form.ddd || ''} onChange={e => setForm({ ...form, ddd: e.target.value.replace(/[^0-9]/g, '') })} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input type="checkbox" id="ativo-cidade" checked={form.ativo} onChange={e => setForm({ ...form, ativo: e.target.checked })} style={{ width: 18, height: 18, accentColor: '#C97B6B', cursor: 'pointer' }} />

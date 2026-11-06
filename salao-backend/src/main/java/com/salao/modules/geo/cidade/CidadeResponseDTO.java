@@ -8,6 +8,7 @@ public record CidadeResponseDTO(
         Long estadoId,
         String estadoNome,
         String estadoUf,
+        String ddd,
         Boolean ativo,
         LocalDateTime dataCriacao,
         LocalDateTime dataAtualizacao
@@ -18,6 +19,7 @@ public record CidadeResponseDTO(
                 c.getEstado() != null ? c.getEstado().getId() : null,
                 c.getEstado() != null ? c.getEstado().getNome() : null,
                 c.getEstado() != null ? c.getEstado().getUf() : null,
+                c.getDdd(),
                 c.getAtivo(), c.getDataCriacao(), c.getDataAtualizacao()
         );
     }

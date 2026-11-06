@@ -8,12 +8,14 @@ export interface Cidade {
   estadoId?: number;
   estadoNome?: string;
   estadoUf?: string;
+  ddd?: string;
   ativo: boolean;
 }
 
 export interface CidadeRequest {
   nome: string;
   estadoId?: number;
+  ddd?: string;
   ativo: boolean;
 }
 

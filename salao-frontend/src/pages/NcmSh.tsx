@@ -4,12 +4,12 @@ import { ncmShService, type NcmSh, type NcmShRequest } from '../services/ncmShSe
 import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnDelete, badge, btnNew, pageTitle, pageSubtitle, erroBanner } from '../styles/theme';
 
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 20 };
-const EMPTY: NcmShRequest = { codigo: '', descricao: '', ativo: true };
+const EMPTY = { codigo: '', descricao: '', aliquotaIcms: '', aliquotaIpi: '', ativo: true };
 
 export default function NcmShPage() {
   const [lista,  setLista]  = useState<NcmSh[]>([]);
   const [modal,  setModal]  = useState(false);
-  const [form,   setForm]   = useState<NcmShRequest & { id?: number }>(EMPTY);
+  const [form,   setForm]   = useState<typeof EMPTY & { id?: number }>(EMPTY);
   const [erro,   setErro]   = useState('');
 
   useEffect(() => { carregar(); }, []);
@@ -21,16 +21,20 @@ export default function NcmShPage() {
 
   const abrirNovo = () => { setForm(EMPTY); setErro(''); setModal(true); };
   const abrirEditar = (item: NcmSh) => {
-    setForm({ id: item.id, codigo: item.codigo, descricao: item.descricao || '', ativo: item.ativo });
+    setForm({ id: item.id, codigo: item.codigo, descricao: item.descricao || '', aliquotaIcms: item.aliquotaIcms != null ? String(item.aliquotaIcms) : '', aliquotaIpi: item.aliquotaIpi != null ? String(item.aliquotaIpi) : '', ativo: item.ativo });
     setErro(''); setModal(true);
   };
 
   const salvar = async () => {
     if (!form.codigo.trim()) { setErro('Código é obrigatório.'); return; }
+    const icms = form.aliquotaIcms === '' ? 0 : Number(form.aliquotaIcms);
+    const ipi = form.aliquotaIpi === '' ? 0 : Number(form.aliquotaIpi);
+    if (!(icms >= 0 && icms <= 100) || !(ipi >= 0 && ipi <= 100)) { setErro('As alíquotas devem estar entre 0 e 100%.'); return; }
+    const dto: NcmShRequest = { codigo: form.codigo, descricao: form.descricao, aliquotaIcms: icms, aliquotaIpi: ipi, ativo: form.ativo };
     try {
       form.id
-        ? await ncmShService.atualizar(form.id, form)
-        : await ncmShService.criar(form);
+        ? await ncmShService.atualizar(form.id, dto)
+        : await ncmShService.criar(dto);
       setModal(false); carregar();
     } catch (e: any) { setErro(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.'); }
   };
@@ -55,7 +59,7 @@ export default function NcmShPage() {
         <table className="salon-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#FDF0E8' }}>
-              {['ID', 'Código', 'Descrição', 'Status'].map(h => (
+              {['ID', 'Código', 'Descrição', 'ICMS (%)', 'IPI (%)', 'Status'].map(h => (
                 <th key={h} style={th}>{h}</th>
               ))}
               <th style={{ ...th, minWidth: 180 }}>Ações</th>
@@ -67,6 +71,8 @@ export default function NcmShPage() {
                 <td style={{ ...td, color: '#8B6E63' }}>{item.id}</td>
                 <td style={{ ...td, fontWeight: 600, fontFamily: 'monospace, monospace' }}>{item.codigo}</td>
                 <td style={td}>{item.descricao || '—'}</td>
+                <td style={td}>{Number(item.aliquotaIcms ?? 0).toFixed(2)}</td>
+                <td style={td}>{Number(item.aliquotaIpi ?? 0).toFixed(2)}</td>
                 <td style={td}><span style={badge(item.ativo)}>{item.ativo ? 'Ativo' : 'Inativo'}</span></td>
                 <td style={td}>
                   <button style={btnEdit} onClick={() => abrirEditar(item)}>Editar</button>
@@ -112,6 +118,16 @@ export default function NcmShPage() {
                   value={form.descricao || ''}
                   onChange={e => setForm({ ...form, descricao: e.target.value })}
                 />
+              </div>
+              <div style={{ gridColumn: 'span 4' }}>
+                <label style={labelStyle}>Alíquota ICMS (%)</label>
+                <input type="number" min={0} max={100} step={0.01} style={inputStyle} placeholder="Ex: 18" value={form.aliquotaIcms}
+                  onChange={e => setForm({ ...form, aliquotaIcms: e.target.value })} />
+              </div>
+              <div style={{ gridColumn: 'span 4' }}>
+                <label style={labelStyle}>Alíquota IPI (%)</label>
+                <input type="number" min={0} max={100} step={0.01} style={inputStyle} placeholder="Ex: 7.5" value={form.aliquotaIpi}
+                  onChange={e => setForm({ ...form, aliquotaIpi: e.target.value })} />
               </div>
               <div style={{ gridColumn: 'span 12', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <input

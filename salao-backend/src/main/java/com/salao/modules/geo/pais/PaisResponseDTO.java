@@ -8,13 +8,14 @@ public record PaisResponseDTO(
         String sigla,
         String nacionalidade,
         String moeda,
+        String ddi,
         Boolean ativo,
         LocalDateTime dataCriacao,
         LocalDateTime dataAtualizacao
 ) {
     public static PaisResponseDTO from(Pais p) {
         return new PaisResponseDTO(
-                p.getId(), p.getNome(), p.getSigla(), p.getNacionalidade(), p.getMoeda(),
+                p.getId(), p.getNome(), p.getSigla(), p.getNacionalidade(), p.getMoeda(), p.getDdi(),
                 p.getAtivo(), p.getDataCriacao(), p.getDataAtualizacao()
         );
     }

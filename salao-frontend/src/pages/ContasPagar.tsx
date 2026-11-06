@@ -4,6 +4,8 @@ import axios from 'axios';
 import { contasPagarService, type ContaPagar, type ContaPagarRequest } from '../services/contasPagarService';
 import BaixaContaModal from '../components/BaixaContaModal';
 import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnDelete, btnNew, pageTitle, pageSubtitle, erroBanner } from '../styles/theme';
+import CampoData from '../components/CampoData';
+import { dataBR } from '../utils/itensCompra';
 
 const API = 'http://localhost:8080/api';
 
@@ -158,11 +160,11 @@ export default function ContasPagar() {
                       <span style={sub}>{brl(conta.valorComDesconto)} até o venc.</span>
                     )}
                   </td>
-                  <td style={td}>{conta.dataVencimento}</td>
+                  <td style={td}>{dataBR(conta.dataVencimento)}</td>
                   <td style={{ ...td, fontWeight: 600 }}>
                     {conta.situacao === 'PAGA' ? (<>
                       {brl(conta.valorPago)}
-                      <span style={sub}>em {conta.dataPagamento}</span>
+                      <span style={sub}>em {dataBR(conta.dataPagamento)}</span>
                     </>) : '—'}
                   </td>
                   <td style={td}>
@@ -217,7 +219,7 @@ export default function ContasPagar() {
               </div>
               <div style={{ gridColumn: 'span 4' }}>
                 <label style={labelStyle}>Data de Vencimento *</label>
-                <input type="date" style={inputStyle} value={form.dataVencimento} onChange={e => setForm({ ...form, dataVencimento: e.target.value })} disabled={modoVer} />
+                <CampoData value={form.dataVencimento} onChange={v => setForm({ ...form, dataVencimento: v })} disabled={modoVer} />
               </div>
               <div style={{ gridColumn: 'span 4' }}>
                 <label style={labelStyle}>Fornecedor *</label>
@@ -250,7 +252,7 @@ export default function ContasPagar() {
 
             {modoVer && contaVer?.situacao === 'PAGA' && (
               <div style={{ backgroundColor: '#FDF6F0', borderRadius: 10, padding: '14px 18px', marginBottom: 16, fontSize: 14, color: '#3D2B1F' }}>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>Pagamento em {contaVer.dataPagamento}</div>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Pagamento em {dataBR(contaVer.dataPagamento)}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4 }}>
                   <span>Valor da conta</span><span>{brl(contaVer.valor)}</span>
                   <span>(−) Desconto {contaVer.percentualDesconto}%</span><span>− {brl(contaVer.valorDesconto)}</span>

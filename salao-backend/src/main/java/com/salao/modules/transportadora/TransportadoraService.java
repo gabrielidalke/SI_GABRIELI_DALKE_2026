@@ -3,7 +3,7 @@ package com.salao.modules.transportadora;
 import com.salao.modules.notaentrada.NotaEntradaRepository;
 import com.salao.modules.geo.cidade.Cidade;
 import com.salao.modules.geo.cidade.CidadeRepository;
-import com.salao.util.CpfCnpjValidator;
+import com.salao.util.TipoPessoa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -26,46 +26,51 @@ public class TransportadoraService {
     }
 
     public TransportadoraResponseDTO criar(TransportadoraRequestDTO dto) {
-        validarCpfCnpj(dto.cpfCnpj());
-        String documento = CpfCnpjValidator.formatar(dto.cpfCnpj());
+        String tipo = TipoPessoa.normalizar(dto.tipoPessoa(), TipoPessoa.JURIDICA, dto.cpfCnpj());
+        String documento = TipoPessoa.documento(tipo, dto.cpfCnpj());
         if (repository.existsByNomeIgnoreCase(dto.nome().trim()))
             throw new RuntimeException("Transportadora já cadastrada");
         if (documento != null && repository.existsByCpfCnpj(documento))
             throw new RuntimeException("Já existe uma transportadora cadastrada com este CPF/CNPJ.");
 
-        var transportadora = Transportadora.builder()
-                .nome(dto.nome().trim())
-                .cpfCnpj(documento)
-                .fone(dto.fone())
-                .endereco(vazioParaNulo(dto.endereco()))
-                .bairro(vazioParaNulo(dto.bairro()))
-                .cep(dto.cep())
-                .ativo(dto.ativo() != null ? dto.ativo() : true)
-                .cidade(resolveCidade(dto.cidadeId()))
-                .build();
-
+        var transportadora = new Transportadora();
+        transportadora.setAtivo(dto.ativo() != null ? dto.ativo() : true);
+        preencher(transportadora, dto, tipo, documento);
         return TransportadoraResponseDTO.from(repository.save(transportadora));
     }
 
     public TransportadoraResponseDTO atualizar(Long id, TransportadoraRequestDTO dto) {
-        validarCpfCnpj(dto.cpfCnpj());
         var transportadora = buscarEntidade(id);
-        String documento = CpfCnpjValidator.formatar(dto.cpfCnpj());
+        String tipo = TipoPessoa.normalizar(dto.tipoPessoa(), TipoPessoa.JURIDICA, dto.cpfCnpj());
+        String documento = TipoPessoa.documento(tipo, dto.cpfCnpj());
         if (repository.existsByNomeIgnoreCaseAndIdNot(dto.nome().trim(), id))
             throw new RuntimeException("Transportadora já cadastrada");
         if (documento != null && repository.existsByCpfCnpjAndIdNot(documento, id))
             throw new RuntimeException("Já existe uma transportadora cadastrada com este CPF/CNPJ.");
 
-        transportadora.setNome(dto.nome().trim());
-        transportadora.setCpfCnpj(documento);
-        transportadora.setFone(dto.fone());
-        transportadora.setEndereco(vazioParaNulo(dto.endereco()));
-        transportadora.setBairro(vazioParaNulo(dto.bairro()));
-        transportadora.setCep(dto.cep());
         if (dto.ativo() != null) transportadora.setAtivo(dto.ativo());
-        transportadora.setCidade(resolveCidade(dto.cidadeId()));
-
+        preencher(transportadora, dto, tipo, documento);
         return TransportadoraResponseDTO.from(repository.save(transportadora));
+    }
+
+    private void preencher(Transportadora t, TransportadoraRequestDTO dto, String tipo, String documento) {
+        t.setTipoPessoa(tipo);
+        t.setNome(dto.nome().trim());
+        t.setNomeFantasia(vazioParaNulo(dto.nomeFantasia()));
+        t.setCpfCnpj(documento);
+        // RG para pessoa física; inscrições (estadual e do substituto tributário) para jurídica
+        t.setRg(TipoPessoa.soSeFisica(tipo, dto.rg()));
+        t.setInscricaoEstadual(TipoPessoa.soSeJuridica(tipo, dto.inscricaoEstadual()));
+        t.setInscEstSubstTrib(TipoPessoa.soSeJuridica(tipo, dto.inscEstSubstTrib()));
+        t.setFone(vazioParaNulo(dto.fone()));
+        t.setEmail(vazioParaNulo(dto.email()));
+        t.setSite(vazioParaNulo(dto.site()));
+        t.setEndereco(vazioParaNulo(dto.endereco()));
+        t.setNumero(vazioParaNulo(dto.numero()));
+        t.setComplemento(vazioParaNulo(dto.complemento()));
+        t.setBairro(vazioParaNulo(dto.bairro()));
+        t.setCep(vazioParaNulo(dto.cep()));
+        t.setCidade(resolveCidade(dto.cidadeId()));
     }
 
     public void deletar(Long id) {
@@ -77,18 +82,6 @@ public class TransportadoraService {
 
     private String vazioParaNulo(String texto) {
         return texto == null || texto.isBlank() ? null : texto.trim();
-    }
-
-    private void validarCpfCnpj(String cpfCnpj) {
-        if (cpfCnpj == null || cpfCnpj.isBlank()) return;
-        String digitos = cpfCnpj.replaceAll("\\D", "");
-        if (digitos.length() == 11) {
-            if (!CpfCnpjValidator.validarCPF(cpfCnpj))
-                throw new RuntimeException("CPF inválido.");
-        } else {
-            if (!CpfCnpjValidator.validarCNPJ(cpfCnpj))
-                throw new RuntimeException("CNPJ inválido.");
-        }
     }
 
     private Cidade resolveCidade(Long id) {

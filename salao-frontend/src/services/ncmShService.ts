@@ -6,12 +6,16 @@ export interface NcmSh {
   id: number;
   codigo: string;
   descricao?: string;
+  aliquotaIcms?: number;
+  aliquotaIpi?: number;
   ativo: boolean;
 }
 
 export interface NcmShRequest {
   codigo: string;
   descricao?: string;
+  aliquotaIcms?: number;
+  aliquotaIpi?: number;
   ativo: boolean;
 }
 

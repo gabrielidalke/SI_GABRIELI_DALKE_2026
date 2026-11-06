@@ -2,13 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fornecedorService } from '../../services/fornecedorService';
-import type { FornecedorRequest } from '../../services/fornecedorService';
-import { condicaoPagamentoService } from '../../services/condicaoPagamentoService';
-import type { CondicaoPagamento } from '../../services/condicaoPagamentoService';
+import type { Fornecedor, FornecedorRequest } from '../../services/fornecedorService';
 import { inputStyle, labelStyle, card, pageTitle, pageSubtitle } from '../../styles/theme';
 import CidadeAutocomplete from '../../components/CidadeAutocomplete';
+import TipoPessoaToggle from '../../components/TipoPessoaToggle';
+import CampoCondicaoPagamento from '../../components/CampoCondicaoPagamento';
 
-const sel: CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 24 };
 
 const SectionHeader = ({ label }: { label: string }) => (
@@ -35,12 +34,13 @@ const ToggleYN = ({ value, onChange }: { value: boolean; onChange: (v: boolean) 
 );
 
 const EMPTY: FornecedorRequest = {
-  tipo: '',
+  tipoPessoa: 'JURIDICA',
   fornecedor: '',
   nomeFantasia: '',
   cpfCnpj: '',
   rg: '',
   inscricaoEstadual: '',
+  inscEstSubstTrib: '',
   inscricaoMunicipal: '',
   endereco: '',
   numero: '',
@@ -58,11 +58,17 @@ const EMPTY: FornecedorRequest = {
   condicaoPagamentoId: null,
 };
 
-export default function FornecedorForm() {
-  const { id } = useParams();
+interface Props {
+  embutido?: boolean;                     // aberto dentro de outra tela (ex.: Nota de Entrada)
+  onSalvo?: (f: Fornecedor) => void;     // devolve o fornecedor criado para já ficar selecionado
+  onCancelar?: () => void;
+}
+
+export default function FornecedorForm({ embutido = false, onSalvo, onCancelar }: Props) {
+  const { id: idRota } = useParams();
+  const id = embutido ? undefined : idRota;
   const navigate = useNavigate();
   const [form, setForm] = useState<FornecedorRequest>(EMPTY);
-  const [condicoes, setCondicoes] = useState<CondicaoPagamento[]>([]);
   const [erro, setErro] = useState('');
   const topoRef = useRef<HTMLDivElement>(null);
 
@@ -73,17 +79,17 @@ export default function FornecedorForm() {
   };
 
   useEffect(() => {
-    condicaoPagamentoService.listar().then(r => setCondicoes(r.data));
     if (id) {
       fornecedorService.buscar(Number(id)).then(r => {
         const f = r.data;
         setForm({
-          tipo: f.tipo || '',
+          tipoPessoa: f.tipoPessoa ?? 'JURIDICA',
           fornecedor: f.fornecedor,
           nomeFantasia: f.nomeFantasia || '',
           cpfCnpj: f.cpfCnpj || '',
           rg: f.rg || '',
           inscricaoEstadual: f.inscricaoEstadual || '',
+          inscEstSubstTrib: f.inscEstSubstTrib || '',
           inscricaoMunicipal: f.inscricaoMunicipal || '',
           endereco: f.endereco || '',
           numero: f.numero || '',
@@ -111,6 +117,8 @@ export default function FornecedorForm() {
     setErro('');
   };
 
+  const juridica = form.tipoPessoa === 'JURIDICA';
+
   const salvar = async () => {
     if (!form.fornecedor.trim()) { mostrarErro('Nome do fornecedor é obrigatório.'); return; }
     if (!form.cep?.trim()) { mostrarErro('CEP é obrigatório.'); return; }
@@ -118,7 +126,10 @@ export default function FornecedorForm() {
     try {
       const dto: FornecedorRequest = { ...form };
       if (id) await fornecedorService.atualizar(Number(id), dto);
-      else await fornecedorService.criar(dto);
+      else {
+        const r = await fornecedorService.criar(dto);
+        if (embutido) { onSalvo?.(r.data); return; }
+      }
       navigate('/fornecedores');
     } catch (e: any) {
       mostrarErro(e?.response?.data?.mensagem || e?.response?.data?.message || 'Erro ao salvar.');
@@ -152,12 +163,8 @@ export default function FornecedorForm() {
             />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
-            <label style={labelStyle}>Tipo</label>
-            <select style={sel} value={form.tipo || ''} onChange={e => set({ tipo: e.target.value })}>
-              <option value="">Selecione</option>
-              <option value="FISICA">Física</option>
-              <option value="JURIDICA">Jurídica</option>
-            </select>
+            <label style={labelStyle}>Tipo de Pessoa *</label>
+            <TipoPessoaToggle value={form.tipoPessoa} onChange={v => set({ tipoPessoa: v })} />
           </div>
           <div style={{ gridColumn: 'span 4' }}>
             <label style={labelStyle}>Fornecedor / Nome *</label>
@@ -174,25 +181,16 @@ export default function FornecedorForm() {
           </div>
         </div>
 
-        {/* ─── Dados da Empresa ─── */}
-        <SectionHeader label="Dados da Empresa" />
+        {/* ─── Dados da Empresa / Pessoa ─── */}
+        <SectionHeader label={juridica ? 'Dados da Empresa' : 'Dados da Pessoa'} />
         <div style={g12}>
           <div style={{ gridColumn: 'span 6' }}>
-            <label style={labelStyle}>Nome Fantasia</label>
+            <label style={labelStyle}>{juridica ? 'Nome Fantasia' : 'Apelido'}</label>
             <input
               style={inputStyle}
-              placeholder="Nome fantasia..."
+              placeholder={juridica ? 'Nome fantasia...' : 'Como é conhecido...'}
               value={form.nomeFantasia || ''}
               onChange={e => set({ nomeFantasia: e.target.value })}
-            />
-          </div>
-          <div style={{ gridColumn: 'span 3' }}>
-            <label style={labelStyle}>Inscrição Estadual</label>
-            <input
-              style={inputStyle}
-              placeholder="IE"
-              value={form.inscricaoEstadual || ''}
-              onChange={e => set({ inscricaoEstadual: e.target.value })}
             />
           </div>
           <div style={{ gridColumn: 'span 3' }}>
@@ -210,23 +208,44 @@ export default function FornecedorForm() {
         <SectionHeader label="Documentos" />
         <div style={g12}>
           <div style={{ gridColumn: 'span 4' }}>
-            <label style={labelStyle}>CPF / CNPJ</label>
+            <label style={labelStyle}>{juridica ? 'CNPJ' : 'CPF'}</label>
             <input
               style={inputStyle}
-              placeholder="000.000.000-00 ou 00.000.000/0000-00"
+              placeholder={juridica ? '00.000.000/0000-00' : '000.000.000-00'}
               value={form.cpfCnpj || ''}
               onChange={e => set({ cpfCnpj: e.target.value })}
             />
           </div>
-          <div style={{ gridColumn: 'span 4' }}>
-            <label style={labelStyle}>RG / IE</label>
-            <input
-              style={inputStyle}
-              placeholder="RG ou Inscrição Estadual"
-              value={form.rg || ''}
-              onChange={e => set({ rg: e.target.value })}
-            />
-          </div>
+          {juridica ? (<>
+            <div style={{ gridColumn: 'span 4' }}>
+              <label style={labelStyle}>Inscrição Estadual</label>
+              <input
+                style={inputStyle}
+                placeholder="IE"
+                value={form.inscricaoEstadual || ''}
+                onChange={e => set({ inscricaoEstadual: e.target.value })}
+              />
+            </div>
+            <div style={{ gridColumn: 'span 4' }}>
+              <label style={labelStyle}>IE Substituto Tributário</label>
+              <input
+                style={inputStyle}
+                placeholder="IE do substituto tributário"
+                value={form.inscEstSubstTrib || ''}
+                onChange={e => set({ inscEstSubstTrib: e.target.value })}
+              />
+            </div>
+          </>) : (
+            <div style={{ gridColumn: 'span 4' }}>
+              <label style={labelStyle}>RG</label>
+              <input
+                style={inputStyle}
+                placeholder="RG"
+                value={form.rg || ''}
+                onChange={e => set({ rg: e.target.value })}
+              />
+            </div>
+          )}
         </div>
 
         {/* ─── Endereço ─── */}
@@ -341,16 +360,7 @@ export default function FornecedorForm() {
         <div style={g12}>
           <div style={{ gridColumn: 'span 6' }}>
             <label style={labelStyle}>Condição de Pagamento</label>
-            <select
-              style={sel}
-              value={form.condicaoPagamentoId || ''}
-              onChange={e => set({ condicaoPagamentoId: e.target.value ? Number(e.target.value) : null })}
-            >
-              <option value="">Selecione</option>
-              {condicoes.map(c => (
-                <option key={c.id} value={c.id}>{c.condicao}</option>
-              ))}
-            </select>
+            <CampoCondicaoPagamento value={form.condicaoPagamentoId ?? null} onChange={v => set({ condicaoPagamentoId: v })} />
           </div>
         </div>
 
@@ -371,6 +381,12 @@ export default function FornecedorForm() {
         >
           Salvar Fornecedor
         </button>
+        {embutido && (
+          <button type="button" onClick={onCancelar}
+            style={{ marginTop: 10, background: 'none', border: '1px solid #C97B6B', color: '#C97B6B', borderRadius: 8, padding: 12, width: '100%', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+            Cancelar
+          </button>
+        )}
       </div>
     </div>
   );

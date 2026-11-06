@@ -6,7 +6,7 @@ import com.salao.modules.notaentrada.NotaEntradaRepository;
 import com.salao.modules.pagamento.CondicaoPagamento;
 import com.salao.modules.pagamento.CondicaoPagamentoRepository;
 import com.salao.modules.pedidocompra.PedidoCompraRepository;
-import com.salao.util.CpfCnpjValidator;
+import com.salao.util.TipoPessoa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,57 +32,55 @@ public class FornecedorService {
     }
 
     public FornecedorResponseDTO criar(FornecedorRequestDTO dto) {
-        validarCpfCnpj(dto.cpfCnpj());
-        String documento = CpfCnpjValidator.formatar(dto.cpfCnpj());
+        String tipo = TipoPessoa.normalizar(dto.tipoPessoa(), TipoPessoa.JURIDICA, dto.cpfCnpj());
+        String documento = TipoPessoa.documento(tipo, dto.cpfCnpj());
         if (documento != null && repository.existsByCpfCnpj(documento))
             throw new RuntimeException("Já existe um fornecedor cadastrado com este CPF/CNPJ.");
 
-        var cidade = dto.cidadeId() != null
-                ? cidadeRepository.findById(dto.cidadeId())
-                        .orElseThrow(() -> new RuntimeException("Cidade não encontrada"))
-                : null;
-        var condicaoPagamento = resolveCondicaoPagamento(dto.condicaoPagamentoId());
-
-        var fornecedor = Fornecedor.builder()
-                .fornecedor(dto.fornecedor().trim())
-                .cpfCnpj(documento)
-                .endereco(vazioParaNulo(dto.endereco()))
-                .bairro(vazioParaNulo(dto.bairro()))
-                .cep(dto.cep())
-                .fone(dto.fone())
-                .inscricaoEstadual(vazioParaNulo(dto.inscricaoEstadual()))
-                .ativo(dto.ativo() != null ? dto.ativo() : true)
-                .cidade(cidade)
-                .condicaoPagamento(condicaoPagamento)
-                .build();
-
+        var fornecedor = new Fornecedor();
+        fornecedor.setAtivo(dto.ativo() != null ? dto.ativo() : true);
+        preencher(fornecedor, dto, tipo, documento);
         return FornecedorResponseDTO.from(repository.save(fornecedor));
     }
 
     public FornecedorResponseDTO atualizar(Long id, FornecedorRequestDTO dto) {
-        validarCpfCnpj(dto.cpfCnpj());
-
         var fornecedor = buscarEntidade(id);
-        String documento = CpfCnpjValidator.formatar(dto.cpfCnpj());
+        String tipo = TipoPessoa.normalizar(dto.tipoPessoa(), TipoPessoa.JURIDICA, dto.cpfCnpj());
+        String documento = TipoPessoa.documento(tipo, dto.cpfCnpj());
         if (documento != null && repository.existsByCpfCnpjAndIdNot(documento, id))
             throw new RuntimeException("Já existe um fornecedor cadastrado com este CPF/CNPJ.");
-        var cidade = dto.cidadeId() != null
-                ? cidadeRepository.findById(dto.cidadeId())
-                        .orElseThrow(() -> new RuntimeException("Cidade não encontrada"))
-                : null;
 
-        fornecedor.setFornecedor(dto.fornecedor().trim());
-        fornecedor.setCpfCnpj(documento);
-        fornecedor.setEndereco(vazioParaNulo(dto.endereco()));
-        fornecedor.setBairro(vazioParaNulo(dto.bairro()));
-        fornecedor.setCep(dto.cep());
-        fornecedor.setFone(dto.fone());
-        fornecedor.setInscricaoEstadual(vazioParaNulo(dto.inscricaoEstadual()));
         if (dto.ativo() != null) fornecedor.setAtivo(dto.ativo());
-        fornecedor.setCidade(cidade);
-        fornecedor.setCondicaoPagamento(resolveCondicaoPagamento(dto.condicaoPagamentoId()));
-
+        preencher(fornecedor, dto, tipo, documento);
         return FornecedorResponseDTO.from(repository.save(fornecedor));
+    }
+
+    // Todos os campos da tela são gravados (antes vários se perdiam ao salvar)
+    private void preencher(Fornecedor f, FornecedorRequestDTO dto, String tipo, String documento) {
+        f.setTipoPessoa(tipo);
+        f.setFornecedor(dto.fornecedor().trim());
+        f.setNomeFantasia(vazioParaNulo(dto.nomeFantasia()));
+        f.setCpfCnpj(documento);
+        // RG para pessoa física; inscrições (estadual e do substituto tributário) para jurídica
+        f.setRg(TipoPessoa.soSeFisica(tipo, dto.rg()));
+        f.setInscricaoEstadual(TipoPessoa.soSeJuridica(tipo, dto.inscricaoEstadual()));
+        f.setInscEstSubstTrib(TipoPessoa.soSeJuridica(tipo, dto.inscEstSubstTrib()));
+        f.setInscricaoMunicipal(vazioParaNulo(dto.inscricaoMunicipal()));
+        f.setEndereco(vazioParaNulo(dto.endereco()));
+        f.setNumero(vazioParaNulo(dto.numero()));
+        f.setComplemento(vazioParaNulo(dto.complemento()));
+        f.setBairro(vazioParaNulo(dto.bairro()));
+        f.setCep(dto.cep());
+        f.setFone(vazioParaNulo(dto.fone()));
+        f.setCelular(vazioParaNulo(dto.celular()));
+        f.setEmail(vazioParaNulo(dto.email()));
+        f.setContato(vazioParaNulo(dto.contato()));
+        f.setSite(vazioParaNulo(dto.site()));
+        f.setObservacao(vazioParaNulo(dto.observacao()));
+        f.setCidade(dto.cidadeId() != null
+                ? cidadeRepository.findById(dto.cidadeId()).orElseThrow(() -> new RuntimeException("Cidade não encontrada"))
+                : null);
+        f.setCondicaoPagamento(resolveCondicaoPagamento(dto.condicaoPagamentoId()));
     }
 
     public void deletar(Long id) {
@@ -99,18 +97,6 @@ public class FornecedorService {
 
     private String vazioParaNulo(String texto) {
         return texto == null || texto.isBlank() ? null : texto.trim();
-    }
-
-    private void validarCpfCnpj(String cpfCnpj) {
-        if (cpfCnpj == null || cpfCnpj.isBlank()) return;
-        String digitos = cpfCnpj.replaceAll("\\D", "");
-        if (digitos.length() == 11) {
-            if (!CpfCnpjValidator.validarCPF(cpfCnpj))
-                throw new RuntimeException("CPF inválido.");
-        } else {
-            if (!CpfCnpjValidator.validarCNPJ(cpfCnpj))
-                throw new RuntimeException("CNPJ inválido.");
-        }
     }
 
     private CondicaoPagamento resolveCondicaoPagamento(Long id) {

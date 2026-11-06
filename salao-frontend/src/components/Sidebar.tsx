@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Calendar, Users, UserCheck, Scissors, Package, Tag, Truck, Ruler, Boxes,
+  Calendar, Users, UserCheck, Briefcase, Scissors, Package, Tag, Truck, Ruler, Boxes,
   CreditCard, MapPin, ChevronDown, ChevronUp,
   ArrowDownCircle, ArrowUpCircle, FileText,
 } from 'lucide-react';
@@ -30,6 +30,7 @@ export default function Sidebar() {
     { label: 'Agendamentos', path: '/agendamentos', icon: <Calendar size={16} /> },
     { label: 'Clientes',     path: '/clientes',     icon: <Users size={16} /> },
     { label: 'Funcionários', path: '/funcionarios', icon: <UserCheck size={16} /> },
+    { label: 'Funções',      path: '/funcoes',      icon: <Briefcase size={16} /> },
     { label: 'Serviços',     path: '/servicos',     icon: <Scissors size={16} /> },
     { label: 'Produtos',          path: '/produtos',         icon: <Package size={16} /> },
     { label: 'Estoque',           path: '/estoque',          icon: <Boxes size={16} /> },

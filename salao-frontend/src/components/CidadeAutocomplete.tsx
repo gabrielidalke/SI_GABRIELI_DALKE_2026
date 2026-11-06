@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { cidadeService } from '../services/cidadeService';
 import type { Cidade } from '../services/cidadeService';
 import { inputStyle } from '../styles/theme';
+import NovaCidadeModal from './NovaCidadeModal';
 
 // Refetched on every mount so cities created/edited since page load show up; concurrent mounts share one request
 let _loading: Promise<Cidade[]> | null = null;
@@ -34,9 +35,11 @@ interface Props {
   value: number | null;
   onChange: (cidadeId: number | null) => void;
   placeholder?: string;
+  permitirCadastro?: boolean; // botão "+ Nova" para cadastrar a cidade sem sair do formulário
 }
 
-export default function CidadeAutocomplete({ value, onChange, placeholder = 'Clique para ver ou digite para buscar...' }: Props) {
+export default function CidadeAutocomplete({ value, onChange, placeholder = 'Clique para ver ou digite para buscar...', permitirCadastro = true }: Props) {
+  const [cadastrando, setCadastrando] = useState(false);
   const [texto, setTexto] = useState('');
   const [aberto, setAberto] = useState(false);
   const [todas, setTodas] = useState<Cidade[]>([]);
@@ -104,6 +107,13 @@ export default function CidadeAutocomplete({ value, onChange, placeholder = 'Cli
     setAberto(false);
   };
 
+  // cidade cadastrada na janelinha: entra na lista e já fica selecionada
+  const cidadeCriada = (c: Cidade) => {
+    setCadastrando(false);
+    setTodas(prev => [...prev, c]);
+    selecionar(c);
+  };
+
   const onFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     // Campo já preenchido (cidade selecionada): seleciona o texto para digitar por cima em vez de filtrar por ele
     if (value && texto) e.target.select();
@@ -112,15 +122,26 @@ export default function CidadeAutocomplete({ value, onChange, placeholder = 'Cli
 
   return (
     <div ref={containerRef} style={{ position: 'relative' }}>
-      <input
-        type="text"
-        style={inputStyle}
-        value={texto}
-        onChange={onInput}
-        onFocus={onFocus}
-        placeholder={placeholder}
-        autoComplete="off"
-      />
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          type="text"
+          style={inputStyle}
+          value={texto}
+          onChange={onInput}
+          onFocus={onFocus}
+          placeholder={placeholder}
+          autoComplete="off"
+        />
+        {permitirCadastro && (
+          <button type="button" title="Cadastrar nova cidade" onClick={() => { setAberto(false); setCadastrando(true); }}
+            style={{ backgroundColor: '#C97B6B', color: 'white', border: 'none', borderRadius: 8, padding: '0 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>
+            + Nova
+          </button>
+        )}
+      </div>
+      {cadastrando && (
+        <NovaCidadeModal aberto nomeInicial={value ? '' : texto} onFechar={() => setCadastrando(false)} onSalva={cidadeCriada} />
+      )}
 
       {aberto && sugestoes.length > 0 && (
         <div style={{

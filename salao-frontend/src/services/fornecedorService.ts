@@ -2,14 +2,17 @@ import axios from 'axios';
 
 const API = 'http://localhost:8080/api';
 
+import type { TipoPessoa } from './tipoPessoa';
+
 export interface Fornecedor {
   id: number;
-  tipo?: string;
+  tipoPessoa?: TipoPessoa;
   fornecedor: string;
   nomeFantasia?: string;
   cpfCnpj?: string;
   rg?: string;
   inscricaoEstadual?: string;
+  inscEstSubstTrib?: string;
   inscricaoMunicipal?: string;
   endereco?: string;
   numero?: string;
@@ -30,12 +33,13 @@ export interface Fornecedor {
 }
 
 export interface FornecedorRequest {
-  tipo?: string;
+  tipoPessoa: TipoPessoa;
   fornecedor: string;
   nomeFantasia?: string;
   cpfCnpj?: string;
   rg?: string;
   inscricaoEstadual?: string;
+  inscEstSubstTrib?: string;
   inscricaoMunicipal?: string;
   endereco?: string;
   numero?: string;

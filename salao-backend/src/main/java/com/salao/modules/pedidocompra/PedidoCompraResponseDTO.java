@@ -1,5 +1,7 @@
 package com.salao.modules.pedidocompra;
 
+import com.salao.modules.notaentrada.DescontoItem;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -32,6 +34,7 @@ public record PedidoCompraResponseDTO(
                            Long classificacaoContaId, String classificacaoNome,
                            BigDecimal quantidade, BigDecimal valorUnitario, BigDecimal valorBruto,
                            BigDecimal descontoPercentual, BigDecimal descontoValor, BigDecimal valorLiquido,
+                           BigDecimal descontoUnitario, BigDecimal valorUnitarioLiquido, // o desconto sai do valor unitário
                            BigDecimal quantidadeRecebida) {}
 
     public static PedidoCompraResponseDTO from(PedidoCompra p, List<PedidoCompraItem> itens) {
@@ -58,6 +61,8 @@ public record PedidoCompraResponseDTO(
                     i.getClassificacaoConta() != null ? i.getClassificacaoConta().getNome() : null,
                     i.getQuantidade(), i.getValorUnitario(), bruto,
                     i.getDescontoPercentual(), i.getDescontoValor(), bruto.subtract(i.getDescontoValor()),
+                    DescontoItem.unitarioDe(i.getDescontoValor(), i.getQuantidade()),
+                    i.getValorUnitario().subtract(DescontoItem.unitarioDe(i.getDescontoValor(), i.getQuantidade())),
                     i.getQuantidadeRecebida()));
         }
         BigDecimal liquido = produtos.subtract(desconto);

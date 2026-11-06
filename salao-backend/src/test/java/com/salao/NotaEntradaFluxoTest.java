@@ -157,6 +157,46 @@ class NotaEntradaFluxoTest {
                 .andExpect(jsonPath("$.mensagem").value("Quantidade deve ser maior que zero"));
     }
 
+    @Test
+    void descontoSaiDoValorUnitarioEmPercentualOuEmReaisPorUnidade() throws Exception {
+        // 7 x R$ 1,15 com 3%: desconto unitário 0,0345 -> R$ 0,03; total do desconto 7 x 0,03 = 0,21
+        // (sobre o total do item daria 8,05 x 3% = 0,24 — a regra agora é pelo valor unitário)
+        String porPercentual = item(shampoo, classMercadoria, "7", "1.15", "3");
+        // R$ 2,50 por unidade em 10 x R$ 20: vira 12,50% e R$ 25,00 de desconto
+        String porReais = "{\"produtoId\":" + condicionador + ",\"classificacaoContaId\":" + classMercadoria
+                + ",\"quantidade\":10,\"valorUnitario\":20,\"descontoPercentual\":0,\"descontoUnitario\":2.5}";
+
+        enviarPost("/api/notas-entrada", nota(1001, fornA, hoje, "", porPercentual, porReais))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.itens[0].descontoUnitario").value(0.03))
+                .andExpect(jsonPath("$.itens[0].valorUnitarioLiquido").value(1.12))
+                .andExpect(jsonPath("$.itens[0].descontoValor").value(0.21))
+                .andExpect(jsonPath("$.itens[1].descontoPercentual").value(12.5))
+                .andExpect(jsonPath("$.itens[1].descontoUnitario").value(2.5))
+                .andExpect(jsonPath("$.itens[1].valorUnitarioLiquido").value(17.5))
+                .andExpect(jsonPath("$.itens[1].descontoValor").value(25.0))
+                .andExpect(jsonPath("$.valorProdutos").value(208.05))
+                .andExpect(jsonPath("$.valorDesconto").value(25.21))
+                .andExpect(jsonPath("$.valorTotal").value(182.84))
+                // custo final unitário = valor unitário líquido (sem frete)
+                .andExpect(jsonPath("$.itens[0].custoFinal").value(1.12))
+                .andExpect(jsonPath("$.itens[1].custoFinal").value(17.5));
+
+        // desconto por unidade maior que o valor unitário
+        enviarPost("/api/notas-entrada", nota(1002, fornA, hoje, "",
+                porReais.replace("\"descontoUnitario\":2.5", "\"descontoUnitario\":25")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Produto Condicionador 300ml: o desconto não pode ser maior que o valor unitário."));
+
+        // o Pedido de Compra segue a mesma regra
+        enviarPost("/api/pedidos-compra", pedido(3001, fornA,
+                "{\"produtoId\":" + shampoo + ",\"quantidade\":7,\"valorUnitario\":1.15,\"descontoPercentual\":3}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.valorDesconto").value(0.21))
+                .andExpect(jsonPath("$.itens[0].descontoUnitario").value(0.03))
+                .andExpect(jsonPath("$.itens[0].valorUnitarioLiquido").value(1.12));
+    }
+
     // ------------------------------------------------------------------ confirmação
 
     @Test

@@ -4,6 +4,8 @@ import type { CSSProperties } from 'react';
 import axios from 'axios';
 import { vendaService, type Venda, type VendaRequest } from '../services/vendaService';
 import { th, td, inputStyle, labelStyle, card, modalOverlay, modalBox, btnPrimary, btnCancel, btnEdit, btnNew, pageTitle, pageSubtitle, erroBanner, sectionTitle } from '../styles/theme';
+import CampoData from '../components/CampoData';
+import { dataBR } from '../utils/itensCompra';
 
 const API = 'http://localhost:8080/api';
 const g12: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 16, marginBottom: 20 };
@@ -191,7 +193,7 @@ export default function Vendas() {
               return (
                 <tr key={venda.id} style={{ borderTop: '1px solid #F0E6DC' }}>
                   <td style={{ ...td, fontWeight: 600 }}>{venda.numeroVenda}</td>
-                  <td style={td}>{venda.dataVenda}</td>
+                  <td style={td}>{dataBR(venda.dataVenda)}</td>
                   <td style={td}>{venda.cliente?.nome || '—'}</td>
                   <td style={{ ...td, color: '#C97B6B', fontWeight: 600 }}>R$ {Number(venda.valorTotal).toFixed(2)}</td>
                   <td style={td}>
@@ -248,7 +250,7 @@ export default function Vendas() {
               </div>
               <div style={{ gridColumn: 'span 4' }}>
                 <label style={labelStyle}>Data *</label>
-                <input type="date" style={inputStyle} value={form.dataVenda} onChange={e => setForm({ ...form, dataVenda: e.target.value })} disabled={modoVer} />
+                <CampoData value={form.dataVenda} onChange={v => setForm({ ...form, dataVenda: v })} disabled={modoVer} />
               </div>
               <div style={{ gridColumn: 'span 4' }}>
                 <label style={labelStyle}>Cliente *</label>

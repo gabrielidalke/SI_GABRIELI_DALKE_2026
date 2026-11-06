@@ -4,10 +4,19 @@ import java.time.LocalDateTime;
 
 public record TransportadoraResponseDTO(
         Long id,
+        String tipoPessoa,
         String nome,
+        String nomeFantasia,
         String cpfCnpj,
+        String rg,
+        String inscricaoEstadual,
+        String inscEstSubstTrib,
         String fone,
+        String email,
+        String site,
         String endereco,
+        String numero,
+        String complemento,
         String bairro,
         String cep,
         Boolean ativo,
@@ -21,8 +30,10 @@ public record TransportadoraResponseDTO(
                 ? new CidadeInfo(t.getCidade().getId(), t.getCidade().getNome())
                 : null;
         return new TransportadoraResponseDTO(
-                t.getId(), t.getNome(), t.getCpfCnpj(), t.getFone(),
-                t.getEndereco(), t.getBairro(), t.getCep(), t.getAtivo(),
+                t.getId(), t.getTipoPessoa(), t.getNome(), t.getNomeFantasia(), t.getCpfCnpj(),
+                t.getRg(), t.getInscricaoEstadual(), t.getInscEstSubstTrib(),
+                t.getFone(), t.getEmail(), t.getSite(),
+                t.getEndereco(), t.getNumero(), t.getComplemento(), t.getBairro(), t.getCep(), t.getAtivo(),
                 t.getCriadoEm(), cidade
         );
     }

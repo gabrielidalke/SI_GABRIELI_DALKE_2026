@@ -12,6 +12,9 @@ public record ProdutoResponseDTO(
         BigDecimal custoMedio,
         BigDecimal desconto,
         Integer quantidade,
+        BigDecimal pesoBruto,
+        BigDecimal pesoLiquido,
+        Integer quantidadeMinima,
         Boolean ativo,
         LocalDateTime criadoEm,
         LocalDateTime atualizadoEm,
@@ -41,7 +44,7 @@ public record ProdutoResponseDTO(
         return new ProdutoResponseDTO(
                 p.getId(), p.getNome(), p.getDescricao(), p.getPrecoVenda(),
                 p.getPrecoCusto(), p.getCustoMedio(), p.getDesconto(),
-                p.getQuantidade(), p.getAtivo(), p.getCriadoEm(), p.getAtualizadoEm(),
+                p.getQuantidade(), p.getPesoBruto(), p.getPesoLiquido(), p.getQuantidadeMinima(), p.getAtivo(), p.getCriadoEm(), p.getAtualizadoEm(),
                 ncmSh, marca, unidade, categoria
         );
     }

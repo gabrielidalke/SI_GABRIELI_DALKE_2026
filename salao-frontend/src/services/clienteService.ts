@@ -2,9 +2,11 @@ import axios from 'axios';
 
 const API = 'http://localhost:8080/api';
 
+import type { TipoPessoa } from './tipoPessoa';
+
 export interface Cliente {
   id?: number;
-  tipo?: string;
+  tipoPessoa?: TipoPessoa;
   nome: string;
   apelido?: string;
   contato?: string;
@@ -15,8 +17,10 @@ export interface Cliente {
   complemento?: string;
   bairro?: string;
   cep?: string;
-  cpf?: string;
+  cpfCnpj?: string;
   rg?: string;
+  inscricaoEstadual?: string;
+  limiteCredito?: number;
   dataNascimento?: string;
   sexo?: string;
   estadoCivil?: string;
@@ -25,6 +29,7 @@ export interface Cliente {
   ativo: boolean;
   cidadeId?: number;
   condicaoPagamentoId?: number;
+  condicaoPagamento?: { id: number; condicao: string };
   cidade?: {
     id: number;
     nome: string;

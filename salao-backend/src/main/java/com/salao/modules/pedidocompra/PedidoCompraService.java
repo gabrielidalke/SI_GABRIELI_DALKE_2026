@@ -5,6 +5,7 @@ import com.salao.modules.classificacaoconta.ClassificacaoContaRepository;
 import com.salao.modules.fornecedor.Fornecedor;
 import com.salao.modules.fornecedor.FornecedorRepository;
 import com.salao.modules.log.LogSistemaService;
+import com.salao.modules.notaentrada.DescontoItem;
 import com.salao.modules.notaentrada.NotaEntradaRepository;
 import com.salao.modules.pagamento.CondicaoPagamento;
 import com.salao.modules.pagamento.CondicaoPagamentoRepository;
@@ -213,10 +214,9 @@ public class PedidoCompraService {
                 throw new RuntimeException("O produto " + produto.getNome() + " aparece mais de uma vez no pedido.");
             BigDecimal quantidade = dto.quantidade().setScale(3, RoundingMode.HALF_UP);
             BigDecimal valorUnitario = dto.valorUnitario().setScale(2, RoundingMode.HALF_UP);
-            BigDecimal percentual = dto.descontoPercentual() != null
-                    ? dto.descontoPercentual().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO.setScale(2);
-            BigDecimal bruto = quantidade.multiply(valorUnitario).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal descontoValor = bruto.multiply(percentual).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            // Mesma regra da nota: o desconto sai do valor unitário
+            var desconto = DescontoItem.calcular(produto.getNome(), quantidade, valorUnitario,
+                    dto.descontoPercentual(), dto.descontoUnitario());
 
             itens.add(PedidoCompraItem.builder()
                     .id(new PedidoCompraItemId(id.getNumero(), id.getSerie(), id.getModelo(), id.getFornecedorId(), produto.getId()))
@@ -224,8 +224,8 @@ public class PedidoCompraService {
                     .classificacaoConta(buscarClassificacaoAtiva(dto.classificacaoContaId()))
                     .quantidade(quantidade)
                     .valorUnitario(valorUnitario)
-                    .descontoPercentual(percentual)
-                    .descontoValor(descontoValor)
+                    .descontoPercentual(desconto.percentual())
+                    .descontoValor(desconto.total())
                     .quantidadeRecebida(BigDecimal.ZERO)
                     .build());
         }

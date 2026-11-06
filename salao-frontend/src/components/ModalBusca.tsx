@@ -18,10 +18,12 @@ interface Props<T> {
   vazio?: string;
   onSelecionar: (item: T) => void;
   onClose: () => void;
+  rotuloNovo?: string;    // ex.: "+ Novo Fornecedor": cadastra sem sair da tela
+  onNovo?: () => void;
 }
 
 // Popup de busca no mesmo estilo do "Buscar Pedido de Compra": tabela com botão Selecionar em cada linha
-export default function ModalBusca<T>({ titulo, descricao, carregar, colunas, chave, texto, vazio, onSelecionar, onClose }: Props<T>) {
+export default function ModalBusca<T>({ titulo, descricao, carregar, colunas, chave, texto, vazio, onSelecionar, onClose, rotuloNovo, onNovo }: Props<T>) {
   const [itens, setItens] = useState<T[] | null>(null);
   const [erro, setErro] = useState('');
   const [filtro, setFiltro] = useState('');
@@ -40,7 +42,14 @@ export default function ModalBusca<T>({ titulo, descricao, carregar, colunas, ch
   return (
     <div style={modalOverlay}>
       <div style={{ ...modalBox, maxWidth: 820, maxHeight: '85vh', overflowY: 'auto' }}>
-        <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: 22, color: '#3D2B1F', margin: '0 0 6px' }}>{titulo}</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: 22, color: '#3D2B1F', margin: '0 0 6px' }}>{titulo}</h3>
+          {onNovo && (
+            <button type="button" onClick={onNovo} style={{ ...btnPrimary, padding: '8px 16px', fontSize: 13 }}>
+              {rotuloNovo ?? '+ Novo'}
+            </button>
+          )}
+        </div>
         {descricao && <p style={{ fontSize: 13, color: '#8B6E63', marginTop: 0, marginBottom: 16 }}>{descricao}</p>}
 
         <input style={{ ...inputStyle, marginBottom: 16 }} placeholder="Pesquisar..." autoFocus

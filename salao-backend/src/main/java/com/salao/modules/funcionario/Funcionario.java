@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import com.salao.modules.funcao.Funcao;
 import com.salao.modules.geo.cidade.Cidade;
 
 import java.math.BigDecimal;
@@ -43,8 +44,23 @@ public class Funcionario {
     @NotBlank
     private String telefone;
 
-    @Column(length = 14, unique = true)
-    private String cpf;
+    // FISICA (CPF + RG) ou JURIDICA (CNPJ + Inscrição Estadual — ex.: profissional MEI)
+    @Builder.Default
+    @Column(name = "tipo_pessoa", nullable = false, length = 8)
+    private String tipoPessoa = "FISICA";
+
+    @Column(name = "cpf_cnpj", length = 18, unique = true)
+    private String cpfCnpj;
+
+    @Column(length = 20)
+    private String rg;
+
+    @Column(name = "inscricao_estadual", length = 20)
+    private String inscricaoEstadual;
+
+    @ManyToOne
+    @JoinColumn(name = "funcao_id")
+    private Funcao funcao;
 
     @Column(name = "data_nascimento")
     private LocalDate dataNascimento;

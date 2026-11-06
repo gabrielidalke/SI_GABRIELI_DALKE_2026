@@ -1,11 +1,13 @@
 package com.salao.modules.cliente;
 
-import com.salao.modules.geo.cidade.Cidade;
 import com.salao.modules.geo.cidade.CidadeRepository;
-import com.salao.util.CpfCnpjValidator;
+import com.salao.modules.pagamento.CondicaoPagamento;
+import com.salao.modules.pagamento.CondicaoPagamentoRepository;
+import com.salao.util.TipoPessoa;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -14,6 +16,7 @@ public class ClienteService {
 
     private final ClienteRepository repository;
     private final CidadeRepository cidadeRepository;
+    private final CondicaoPagamentoRepository condicaoPagamentoRepository;
 
     public List<Cliente> listar() {
         return repository.findAll();
@@ -25,44 +28,35 @@ public class ClienteService {
     }
 
     public Cliente salvar(ClienteDTO dto) {
-        if (dto.cpf() != null && !dto.cpf().isBlank()) {
-            if (!CpfCnpjValidator.validarCPF(dto.cpf()))
-                throw new RuntimeException("CPF inválido.");
-            if (repository.existsByCpf(dto.cpf()))
-                throw new RuntimeException("CPF já cadastrado");
-        }
+        String tipo = TipoPessoa.normalizar(dto.tipoPessoa(), TipoPessoa.FISICA, dto.cpfCnpj());
+        String documento = TipoPessoa.documento(tipo, dto.cpfCnpj());
+        if (documento != null && repository.existsByCpfCnpj(documento))
+            throw new RuntimeException("CPF/CNPJ já cadastrado");
 
-        Cidade cidade = null;
-        if (dto.cidadeId() != null) {
-            cidade = cidadeRepository.findById(dto.cidadeId()).orElse(null);
-        }
-
-        return repository.save(Cliente.builder()
-                .nome(dto.nome())
-                .apelido(dto.apelido())
-                .email(dto.email())
-                .telefone(dto.telefone())
-                .endereco(dto.endereco())
-                .numero(dto.numero())
-                .complemento(dto.complemento())
-                .bairro(dto.bairro())
-                .cep(dto.cep())
-                .cpf(dto.cpf())
-                .rg(dto.rg())
-                .dataNascimento(dto.dataNascimento())
-                .sexo(dto.sexo())
-                .estadoCivil(dto.estadoCivil())
-                .observacao(dto.observacao())
-                .cidade(cidade)
-                .build());
+        var c = new Cliente();
+        c.setAtivo(dto.ativo() != null ? dto.ativo() : true);
+        preencher(c, dto, tipo, documento);
+        return repository.save(c);
     }
 
     public Cliente atualizar(Long id, ClienteDTO dto) {
         Cliente c = buscarPorId(id);
+        String tipo = TipoPessoa.normalizar(dto.tipoPessoa(), TipoPessoa.FISICA, dto.cpfCnpj());
+        String documento = TipoPessoa.documento(tipo, dto.cpfCnpj());
+        if (documento != null && repository.existsByCpfCnpjAndIdNot(documento, id))
+            throw new RuntimeException("CPF/CNPJ já cadastrado");
 
-        if (dto.cpf() != null && !dto.cpf().isBlank() && !CpfCnpjValidator.validarCPF(dto.cpf()))
-            throw new RuntimeException("CPF inválido.");
+        preencher(c, dto, tipo, documento);
+        if (dto.ativo() != null) c.setAtivo(dto.ativo());
+        return repository.save(c);
+    }
 
+    public void deletar(Long id) {
+        repository.deleteById(id);
+    }
+
+    private void preencher(Cliente c, ClienteDTO dto, String tipo, String documento) {
+        c.setTipoPessoa(tipo);
         c.setNome(dto.nome());
         c.setApelido(dto.apelido());
         c.setEmail(dto.email());
@@ -72,24 +66,26 @@ public class ClienteService {
         c.setComplemento(dto.complemento());
         c.setBairro(dto.bairro());
         c.setCep(dto.cep());
-        c.setCpf(dto.cpf());
-        c.setRg(dto.rg());
+        c.setCpfCnpj(documento);
+        // RG para pessoa física; Inscrição Estadual para jurídica
+        c.setRg(TipoPessoa.soSeFisica(tipo, dto.rg()));
+        c.setInscricaoEstadual(TipoPessoa.soSeJuridica(tipo, dto.inscricaoEstadual()));
         c.setDataNascimento(dto.dataNascimento());
         c.setSexo(dto.sexo());
         c.setEstadoCivil(dto.estadoCivil());
         c.setObservacao(dto.observacao());
-        c.setAtivo(dto.ativo());
-
-        if (dto.cidadeId() != null) {
-            cidadeRepository.findById(dto.cidadeId()).ifPresent(c::setCidade);
-        } else {
-            c.setCidade(null);
-        }
-
-        return repository.save(c);
+        c.setCidade(dto.cidadeId() != null
+                ? cidadeRepository.findById(dto.cidadeId()).orElseThrow(() -> new RuntimeException("Cidade não encontrada"))
+                : null);
+        c.setCondicaoPagamento(condicaoAtiva(dto.condicaoPagamentoId()));
+        c.setLimiteCredito(dto.limiteCredito() != null ? dto.limiteCredito() : BigDecimal.ZERO);
     }
 
-    public void deletar(Long id) {
-        repository.deleteById(id);
+    private CondicaoPagamento condicaoAtiva(Long id) {
+        var condicao = condicaoPagamentoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Condição de pagamento não encontrada"));
+        if (Boolean.FALSE.equals(condicao.getAtivo()))
+            throw new RuntimeException("Condição de pagamento inativa: " + condicao.getCondicao());
+        return condicao;
     }
 }

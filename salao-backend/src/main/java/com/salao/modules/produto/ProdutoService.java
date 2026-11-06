@@ -33,6 +33,7 @@ public class ProdutoService {
     }
 
     public ProdutoResponseDTO salvar(ProdutoDTO dto) {
+        validarPesos(dto);
         if (repository.existsByNomeIgnoreCase(dto.nome()))
             throw new RuntimeException("Produto já cadastrado");
         return ProdutoResponseDTO.from(repository.save(Produto.builder()
@@ -42,6 +43,9 @@ public class ProdutoService {
                 .precoCusto(dto.precoCusto())
                 .desconto(dto.desconto() != null ? dto.desconto() : BigDecimal.ZERO)
                 .quantidade(dto.quantidade() != null ? dto.quantidade() : 0)
+                .pesoBruto(valor(dto.pesoBruto()))
+                .pesoLiquido(valor(dto.pesoLiquido()))
+                .quantidadeMinima(dto.quantidadeMinima() != null ? dto.quantidadeMinima() : 0)
                 .ncmSh(resolverNcmSh(dto.ncmShId()))
                 .marca(resolverMarca(dto.marcaId()))
                 .unidadeMedida(resolverUnidadeMedida(dto.unidadeMedidaId()))
@@ -51,6 +55,7 @@ public class ProdutoService {
 
     public ProdutoResponseDTO atualizar(Long id, ProdutoDTO dto) {
         Produto p = buscarEntidade(id);
+        validarPesos(dto);
         if (!p.getNome().equalsIgnoreCase(dto.nome()) && repository.existsByNomeIgnoreCase(dto.nome()))
             throw new RuntimeException("Produto já cadastrado");
         p.setNome(dto.nome());
@@ -59,6 +64,9 @@ public class ProdutoService {
         p.setPrecoCusto(dto.precoCusto());
         if (dto.desconto() != null) p.setDesconto(dto.desconto());
         p.setQuantidade(dto.quantidade());
+        p.setPesoBruto(valor(dto.pesoBruto()));
+        p.setPesoLiquido(valor(dto.pesoLiquido()));
+        p.setQuantidadeMinima(dto.quantidadeMinima() != null ? dto.quantidadeMinima() : 0);
         p.setAtivo(dto.ativo());
         p.setNcmSh(resolverNcmSh(dto.ncmShId()));
         p.setMarca(resolverMarca(dto.marcaId()));
@@ -98,5 +106,15 @@ public class ProdutoService {
         if (categoriaId == null) return null;
         return categoriaRepository.findById(categoriaId)
                 .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+    }
+
+    // O peso líquido (só o produto) não pode passar do peso bruto (produto + embalagem)
+    private void validarPesos(ProdutoDTO dto) {
+        if (dto.pesoBruto() != null && dto.pesoLiquido() != null && dto.pesoLiquido().compareTo(dto.pesoBruto()) > 0)
+            throw new RuntimeException("Peso líquido não pode ser maior que o peso bruto.");
+    }
+
+    private BigDecimal valor(BigDecimal v) {
+        return v != null ? v : BigDecimal.ZERO;
     }
 }
